@@ -2,10 +2,14 @@
   "name": "gatinho-pet",
   "private": true,
   "scripts": {
+    "dev": "pnpm run --parallel dev:api dev:web",
     "dev:api": "pnpm --filter api dev",
     "dev:web": "pnpm --filter web dev",
+    "build": "pnpm run build:api && pnpm run build:web",
     "build:api": "pnpm --filter api build",
     "build:web": "pnpm --filter web build",
-    "dev": "pnpm run --parallel dev:api dev:web"
+    "type-check": "pnpm --filter api type-check && pnpm --filter web type-check",
+    "test": "pnpm --filter api test",
+    "test:api": "pnpm --filter api test"
   }
 }
