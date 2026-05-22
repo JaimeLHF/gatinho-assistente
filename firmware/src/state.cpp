@@ -1,0 +1,147 @@
+#include "state.h"
+#include "network.h"
+#include "config.h"
+
+#include <ArduinoJson.h>
+#include <time.h>
+
+static AppState    currentState = STATE_CONNECTING;
+static EventData   currentEvent = { "", "", 5, false };
+static unsigned long lastPollMs = 0;
+static bool        firstPoll   = true;
+
+// Time sync: offset between server time and local millis
+static time_t      syncedEpoch    = 0;
+static unsigned long syncedMillis = 0;
+
+static time_t currentEpoch() {
+    if (syncedEpoch == 0) return 0;
+    unsigned long elapsed = (millis() - syncedMillis) / 1000;
+    return syncedEpoch + (time_t)elapsed;
+}
+
+// Parse ISO 8601 "2026-05-22T20:30:00.000Z" to epoch
+static time_t parseISO(const String& iso) {
+    struct tm t;
+    memset(&t, 0, sizeof(t));
+    // "2026-05-22T20:30:00"
+    sscanf(iso.c_str(), "%d-%d-%dT%d:%d:%d",
+           &t.tm_year, &t.tm_mon, &t.tm_mday,
+           &t.tm_hour, &t.tm_min, &t.tm_sec);
+    t.tm_year -= 1900;
+    t.tm_mon  -= 1;
+    return mktime(&t) - _timezone;
+}
+
+void stateSetup() {
+    currentState = STATE_CONNECTING;
+    setenv("TZ", "UTC0", 1);
+    tzset();
+}
+
+void stateUpdate() {
+    // Handle WiFi connection state
+    if (!networkIsConnected()) {
+        if (currentState != STATE_CONNECTING) {
+            currentState = STATE_CONNECTING;
+        }
+        return;
+    }
+
+    if (currentState == STATE_CONNECTING) {
+        currentState = STATE_IDLE;
+        Serial.println("[state] connected, switching to IDLE");
+    }
+
+    // Poll periodically
+    unsigned long now = millis();
+    if (firstPoll || (now - lastPollMs >= POLL_INTERVAL_MS)) {
+        firstPoll = false;
+        lastPollMs = now;
+
+        String eventJson, serverTime;
+        if (networkPoll(eventJson, serverTime)) {
+            stateSyncTime(serverTime);
+            stateSetEvent(eventJson);
+        } else {
+            currentState = STATE_ERROR;
+            return;
+        }
+    }
+
+    // Determine alert state
+    if (currentEvent.valid) {
+        int mins = stateMinutesUntilEvent();
+        if (mins >= 0 && mins <= currentEvent.alertMinutesBefore) {
+            currentState = STATE_ALERT;
+        } else if (mins < 0) {
+            // Event passed, clear it
+            currentEvent.valid = false;
+            currentState = STATE_IDLE;
+        } else {
+            currentState = STATE_IDLE;
+        }
+    } else {
+        if (currentState == STATE_ALERT) {
+            currentState = STATE_IDLE;
+        }
+    }
+}
+
+AppState stateGet() {
+    return currentState;
+}
+
+EventData stateGetEvent() {
+    return currentEvent;
+}
+
+void stateSyncTime(const String& isoTime) {
+    syncedEpoch  = parseISO(isoTime);
+    syncedMillis = millis();
+    Serial.printf("[time] synced to epoch %ld\n", (long)syncedEpoch);
+}
+
+void stateSetEvent(const String& eventJson) {
+    if (eventJson.isEmpty()) {
+        currentEvent.valid = false;
+        return;
+    }
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, eventJson);
+    if (err) {
+        currentEvent.valid = false;
+        return;
+    }
+
+    currentEvent.title              = doc["title"].as<String>();
+    currentEvent.startsAt           = doc["startsAt"].as<String>();
+    currentEvent.alertMinutesBefore = doc["alertMinutesBefore"] | 5;
+    currentEvent.valid              = true;
+}
+
+String stateGetTimeStr() {
+    time_t t = currentEpoch();
+    if (t == 0) return "--:--";
+    struct tm* info = gmtime(&t);
+    char buf[6];
+    snprintf(buf, sizeof(buf), "%02d:%02d", info->tm_hour, info->tm_min);
+    return String(buf);
+}
+
+String stateGetDateStr() {
+    time_t t = currentEpoch();
+    if (t == 0) return "--/--";
+    struct tm* info = gmtime(&t);
+    char buf[6];
+    snprintf(buf, sizeof(buf), "%02d/%02d", info->tm_mday, info->tm_mon + 1);
+    return String(buf);
+}
+
+int stateMinutesUntilEvent() {
+    if (!currentEvent.valid) return 9999;
+    time_t now   = currentEpoch();
+    time_t event = parseISO(currentEvent.startsAt);
+    return (int)((event - now) / 60);
+}
