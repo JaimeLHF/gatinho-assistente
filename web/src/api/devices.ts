@@ -11,6 +11,11 @@ export async function createDevice(name: string): Promise<DeviceWithToken> {
   return res.data;
 }
 
+export async function updateDevice(id: string, name: string): Promise<Device> {
+  const res = await api.patch<Device>(`/devices/${id}`, { name });
+  return res.data;
+}
+
 export async function deleteDevice(id: string): Promise<void> {
   await api.delete(`/devices/${id}`);
 }

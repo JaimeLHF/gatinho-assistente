@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { ApiError } from "../middlewares/errorHandler.js";
-import type { CreateDeviceInput } from "../schemas/device.js";
+import type { CreateDeviceInput, UpdateDeviceInput } from "../schemas/device.js";
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -38,6 +38,20 @@ export async function create(userId: string, data: CreateDeviceInput) {
   });
 
   return { ...device, token: plainToken };
+}
+
+export async function update(userId: string, deviceId: string, data: UpdateDeviceInput) {
+  const device = await prisma.device.findUnique({ where: { id: deviceId } });
+
+  if (!device || device.userId !== userId) {
+    throw new ApiError(404, "DEVICE_NOT_FOUND", "Device not found");
+  }
+
+  return prisma.device.update({
+    where: { id: deviceId },
+    data,
+    select: { id: true, name: true, lastSeenAt: true, createdAt: true },
+  });
 }
 
 export async function remove(userId: string, deviceId: string) {

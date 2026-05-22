@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as devicesApi from "../api/devices";
+import type { Device } from "../types";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("pt-BR", {
@@ -29,6 +30,8 @@ export default function Devices() {
   const [showForm, setShowForm] = useState(false);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState<Device | null>(null);
+  const [editName, setEditName] = useState("");
 
   const { data: devices = [], isLoading } = useQuery({
     queryKey: ["devices"],
@@ -45,6 +48,15 @@ export default function Devices() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, newName }: { id: string; newName: string }) =>
+      devicesApi.updateDevice(id, newName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["devices"] });
+      setEditing(null);
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => devicesApi.deleteDevice(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["devices"] }),
@@ -55,6 +67,18 @@ export default function Devices() {
     if (name.trim()) {
       createMutation.mutate(name.trim());
     }
+  }
+
+  function handleEdit(e: FormEvent) {
+    e.preventDefault();
+    if (editing && editName.trim()) {
+      updateMutation.mutate({ id: editing.id, newName: editName.trim() });
+    }
+  }
+
+  function startEdit(device: Device) {
+    setEditing(device);
+    setEditName(device.name);
   }
 
   async function handleCopy() {
@@ -149,31 +173,70 @@ export default function Devices() {
               key={device.id}
               className="flex items-center justify-between rounded-lg bg-white p-4 shadow-sm"
             >
-              <div>
-                <h3 className="font-medium text-gray-900">{device.name}</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Criado em {formatDate(device.createdAt)}
-                  {device.lastSeenAt && (
-                    <span className="ml-2 inline-flex items-center gap-1">
-                      <span className="inline-block h-2 w-2 rounded-full bg-green-400" />
-                      Visto {timeAgo(device.lastSeenAt)}
-                    </span>
-                  )}
-                  {!device.lastSeenAt && (
-                    <span className="ml-2 text-gray-400">· Nunca conectou</span>
-                  )}
-                </p>
+              <div className="min-w-0 flex-1">
+                {editing?.id === device.id ? (
+                  <form onSubmit={handleEdit} className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={updateMutation.isPending}
+                      className="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      Salvar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditing(null)}
+                      className="rounded border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancelar
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <h3 className="font-medium text-gray-900">{device.name}</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Criado em {formatDate(device.createdAt)}
+                      {device.lastSeenAt && (
+                        <span className="ml-2 inline-flex items-center gap-1">
+                          <span className="inline-block h-2 w-2 rounded-full bg-green-400" />
+                          Visto {timeAgo(device.lastSeenAt)}
+                        </span>
+                      )}
+                      {!device.lastSeenAt && (
+                        <span className="ml-2 text-gray-400">· Nunca conectou</span>
+                      )}
+                    </p>
+                  </>
+                )}
               </div>
-              <button
-                onClick={() => {
-                  if (confirm(`Revogar o dispositivo "${device.name}"?`)) {
-                    deleteMutation.mutate(device.id);
-                  }
-                }}
-                className="rounded px-3 py-1 text-sm text-red-600 hover:bg-red-50"
-              >
-                Revogar
-              </button>
+
+              {editing?.id !== device.id && (
+                <div className="ml-4 flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => startEdit(device)}
+                    className="rounded px-3 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Revogar o dispositivo "${device.name}"?`)) {
+                        deleteMutation.mutate(device.id);
+                      }
+                    }}
+                    className="rounded px-3 py-1 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    Revogar
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

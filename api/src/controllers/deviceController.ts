@@ -11,6 +11,11 @@ export async function create(req: Request, res: Response) {
   res.status(201).json(result);
 }
 
+export async function update(req: Request, res: Response) {
+  const device = await deviceService.update(req.user!.id, req.params.id as string, req.body);
+  res.json(device);
+}
+
 export async function remove(req: Request, res: Response) {
   await deviceService.remove(req.user!.id, req.params.id as string);
   res.status(204).send();
