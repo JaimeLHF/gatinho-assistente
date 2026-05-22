@@ -16,11 +16,15 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const url = error.config?.url as string | undefined;
+    const isAuthRoute = url?.startsWith("/auth/");
+
+    if (error.response?.status === 401 && !isAuthRoute) {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
       window.location.href = "/login";
     }
+
     return Promise.reject(error);
   },
 );

@@ -3,9 +3,10 @@ import { useNavigate, Link } from "react-router";
 import { useAuth } from "../hooks/useAuth";
 import { AxiosError } from "axios";
 
-export default function Login() {
-  const { login } = useAuth();
+export default function Register() {
+  const { register } = useAuth();
   const navigate = useNavigate();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -16,11 +17,11 @@ export default function Login() {
     setError("");
     setSubmitting(true);
     try {
-      await login(email, password);
+      await register(email, password, name);
       navigate("/");
     } catch (err) {
       if (err instanceof AxiosError) {
-        setError(err.response?.data?.error?.message ?? "Erro ao fazer login");
+        setError(err.response?.data?.error?.message ?? "Erro ao criar conta");
       } else {
         setError("Erro inesperado");
       }
@@ -33,7 +34,7 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm rounded-lg bg-white p-8 shadow">
         <h1 className="mb-6 text-center text-2xl font-bold text-gray-900">
-          Gatinho Pet
+          Criar conta
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -42,6 +43,20 @@ export default function Login() {
               {error}
             </p>
           )}
+
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              Nome
+            </label>
+            <input
+              id="name"
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+            />
+          </div>
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -77,14 +92,14 @@ export default function Login() {
             disabled={submitting}
             className="w-full rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
           >
-            {submitting ? "Entrando..." : "Entrar"}
+            {submitting ? "Criando..." : "Criar conta"}
           </button>
         </form>
 
         <p className="mt-4 text-center text-sm text-gray-500">
-          Sem conta?{" "}
-          <Link to="/register" className="text-indigo-600 hover:underline">
-            Criar conta
+          Ja tem conta?{" "}
+          <Link to="/login" className="text-indigo-600 hover:underline">
+            Entrar
           </Link>
         </p>
       </div>
