@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as eventsApi from "../api/events";
 import EventForm, { type EventFormData } from "../components/EventForm";
+import ConfirmModal from "../components/ConfirmModal";
+import { useToast } from "../hooks/useToast";
 import type { Event } from "../types";
 
 const STATUS_LABEL: Record<Event["status"], string> = {
@@ -38,12 +40,22 @@ function buildPayload(data: EventFormData) {
 
 export default function Events() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Event | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Event | null>(null);
+
+  // Filters
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+
+  const queryParams: Record<string, string> = {};
+  if (filterFrom) queryParams.from = new Date(filterFrom).toISOString();
+  if (filterTo) queryParams.to = new Date(filterTo).toISOString();
 
   const { data: events = [], isLoading } = useQuery({
-    queryKey: ["events"],
-    queryFn: () => eventsApi.listEvents(),
+    queryKey: ["events", queryParams],
+    queryFn: () => eventsApi.listEvents(queryParams),
   });
 
   const createMutation = useMutation({
@@ -51,7 +63,9 @@ export default function Events() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       setShowForm(false);
+      toast.success("Evento criado");
     },
+    onError: () => toast.error("Erro ao criar evento"),
   });
 
   const updateMutation = useMutation({
@@ -60,18 +74,28 @@ export default function Events() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       setEditing(null);
+      toast.success("Evento atualizado");
     },
+    onError: () => toast.error("Erro ao atualizar evento"),
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: Event["status"] }) =>
       eventsApi.updateEvent(id, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast.success("Status atualizado");
+    },
+    onError: () => toast.error("Erro ao atualizar status"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => eventsApi.deleteEvent(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast.success("Evento excluido");
+    },
+    onError: () => toast.error("Erro ao excluir evento"),
   });
 
   if (isLoading) {
@@ -117,8 +141,41 @@ export default function Events() {
         </button>
       </div>
 
+      {/* Filters */}
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500">De</label>
+          <input
+            type="date"
+            value={filterFrom}
+            onChange={(e) => setFilterFrom(e.target.value)}
+            className="mt-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500">Ate</label>
+          <input
+            type="date"
+            value={filterTo}
+            onChange={(e) => setFilterTo(e.target.value)}
+            className="mt-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+          />
+        </div>
+        {(filterFrom || filterTo) && (
+          <button
+            onClick={() => {
+              setFilterFrom("");
+              setFilterTo("");
+            }}
+            className="text-xs text-indigo-600 hover:underline"
+          >
+            Limpar filtros
+          </button>
+        )}
+      </div>
+
       {events.length === 0 ? (
-        <p className="mt-6 text-center text-gray-500">Nenhum evento cadastrado.</p>
+        <p className="mt-6 text-center text-gray-500">Nenhum evento encontrado.</p>
       ) : (
         <div className="mt-4 space-y-3">
           {events.map((event) => (
@@ -167,11 +224,7 @@ export default function Events() {
                   Editar
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm("Excluir este evento?")) {
-                      deleteMutation.mutate(event.id);
-                    }
-                  }}
+                  onClick={() => setDeleteTarget(event)}
                   className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
                 >
                   Excluir
@@ -181,6 +234,20 @@ export default function Events() {
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        title="Excluir evento"
+        message={`Tem certeza que deseja excluir "${deleteTarget?.title}"?`}
+        confirmLabel="Excluir"
+        onConfirm={() => {
+          if (deleteTarget) {
+            deleteMutation.mutate(deleteTarget.id);
+            setDeleteTarget(null);
+          }
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

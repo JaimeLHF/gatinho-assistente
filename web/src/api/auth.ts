@@ -35,3 +35,12 @@ export async function getMe(): Promise<User> {
   const res = await api.get<User>("/me");
   return res.data;
 }
+
+export async function updateProfile(data: { name?: string; email?: string }): Promise<User> {
+  const res = await api.patch<User>("/me", data);
+  return res.data;
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await api.post("/me/change-password", { currentPassword, newPassword });
+}

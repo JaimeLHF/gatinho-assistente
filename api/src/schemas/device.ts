@@ -1,7 +1,7 @@
 import { z } from "zod/v4";
 
 export const createDeviceSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).max(100),
 });
 
 export const deviceParamsSchema = z.object({
@@ -9,7 +9,7 @@ export const deviceParamsSchema = z.object({
 });
 
 export const updateDeviceSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).max(100),
 });
 
 export type CreateDeviceInput = z.infer<typeof createDeviceSchema>;

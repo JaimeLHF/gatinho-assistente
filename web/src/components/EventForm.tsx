@@ -69,6 +69,7 @@ export default function EventForm({
         <input
           id="title"
           required
+          maxLength={200}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
@@ -82,6 +83,7 @@ export default function EventForm({
         <textarea
           id="description"
           rows={2}
+          maxLength={2000}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"

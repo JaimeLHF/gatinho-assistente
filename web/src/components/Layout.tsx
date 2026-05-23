@@ -45,7 +45,14 @@ export default function Layout() {
             </NavLink>
             {user && (
               <>
-                <span className="text-sm text-gray-500">{user.name}</span>
+                <NavLink
+                  to="/profile"
+                  className={({ isActive }) =>
+                    `text-sm ${isActive ? "text-indigo-600 font-medium" : "text-gray-500 hover:text-gray-900"}`
+                  }
+                >
+                  {user.name}
+                </NavLink>
                 <button
                   onClick={handleLogout}
                   className="text-sm text-gray-500 hover:text-red-600"

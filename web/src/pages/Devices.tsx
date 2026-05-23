@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as devicesApi from "../api/devices";
+import ConfirmModal from "../components/ConfirmModal";
+import { useToast } from "../hooks/useToast";
 import type { Device } from "../types";
 
 function formatDate(iso: string): string {
@@ -26,12 +28,14 @@ function timeAgo(iso: string): string {
 
 export default function Devices() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState<Device | null>(null);
   const [editName, setEditName] = useState("");
+  const [revokeTarget, setRevokeTarget] = useState<Device | null>(null);
 
   const { data: devices = [], isLoading } = useQuery({
     queryKey: ["devices"],
@@ -45,7 +49,9 @@ export default function Devices() {
       setCreatedToken(data.token);
       setName("");
       setShowForm(false);
+      toast.success("Dispositivo criado");
     },
+    onError: () => toast.error("Erro ao criar dispositivo"),
   });
 
   const updateMutation = useMutation({
@@ -54,12 +60,18 @@ export default function Devices() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["devices"] });
       setEditing(null);
+      toast.success("Dispositivo renomeado");
     },
+    onError: () => toast.error("Erro ao renomear dispositivo"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => devicesApi.deleteDevice(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["devices"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["devices"] });
+      toast.success("Dispositivo revogado");
+    },
+    onError: () => toast.error("Erro ao revogar dispositivo"),
   });
 
   function handleCreate(e: FormEvent) {
@@ -226,11 +238,7 @@ export default function Devices() {
                     Editar
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm(`Revogar o dispositivo "${device.name}"?`)) {
-                        deleteMutation.mutate(device.id);
-                      }
-                    }}
+                    onClick={() => setRevokeTarget(device)}
                     className="rounded px-3 py-1 text-sm text-red-600 hover:bg-red-50"
                   >
                     Revogar
@@ -241,6 +249,20 @@ export default function Devices() {
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        open={!!revokeTarget}
+        title="Revogar dispositivo"
+        message={`Tem certeza que deseja revogar "${revokeTarget?.name}"? O token deixara de funcionar.`}
+        confirmLabel="Revogar"
+        onConfirm={() => {
+          if (revokeTarget) {
+            deleteMutation.mutate(revokeTarget.id);
+            setRevokeTarget(null);
+          }
+        }}
+        onCancel={() => setRevokeTarget(null)}
+      />
     </div>
   );
 }
