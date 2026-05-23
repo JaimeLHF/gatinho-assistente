@@ -8,11 +8,17 @@
  * 3. Board: "ESP32S3 Dev Module"
  *    USB CDC On Boot: Enabled | Flash Size: 16MB | PSRAM: OPI PSRAM
  *
- * Funcionalidades:
- * - Conecta WiFi e faz polling da API a cada 60s
- * - Sincroniza relogio do servidor
- * - Mostra hora, data, gatinho pixel art
- * - Alerta visual quando evento esta proximo
+ * Frames (via Piskel → png_to_h.py → frames.h):
+ *   0 = idle (olhos abertos)
+ *   1 = blink (olhos fechados)
+ *   2 = wave A (acenando pos 1)
+ *   3 = wave B (acenando pos 2)
+ *
+ * Estados:
+ *   CONNECTING → frame 0 + "Conectando WiFi..."
+ *   IDLE       → frame 0, pisca a cada 5s (frame 1)
+ *   ALERT      → cicla frames 2-3 (acenando) + barra de evento
+ *   ERROR      → frame 1 + "Erro de conexao"
  */
 
 #include <WiFi.h>
@@ -20,6 +26,7 @@
 #include <ArduinoJson.h>
 #include <TFT_eSPI.h>
 #include <time.h>
+#include "frames.h"
 
 // =============================================================
 // >>>  CONFIGURE AQUI  <<<
@@ -31,13 +38,31 @@
 #define POLL_INTERVAL_MS 60000
 // =============================================================
 
-// ---- Display ----
-TFT_eSPI tft;
-TFT_eSprite sprite(&tft);
+// ---- Hardware ----
+#define LCD_POWER_PIN  15
+#define LCD_BL_PIN     38
 
-#define W 170
-#define H 320
-#define CX (W / 2)
+// ---- Display (portrait) ----
+TFT_eSPI    tft;
+TFT_eSprite fb(&tft);
+#define SCREEN_W 170
+#define SCREEN_H 320
+#define CX (SCREEN_W / 2)
+
+// ---- Cores cenario ----
+#define COL_BG        0x1926  // fundo azul escuro
+#define COL_GROUND    0x6BC4
+#define COL_GROUND_HI 0x8C68
+#define COL_SHADOW    0x528A
+#define TEXT_WHITE    0xFFFF
+#define TEXT_DIM      0x9CF3
+#define ALERT_COLOR   0xFD20  // amarelo
+#define ALERT_BG      0x6180
+
+// ---- Cat positioning ----
+#define CAT_SCALE  1   // arte ja esta no tamanho certo (98x107)
+#define CAT_OX     ((SCREEN_W - CAT_FRAME_W) / 2)
+#define CAT_OY     88
 
 // ---- States ----
 enum AppState { STATE_CONNECTING, STATE_IDLE, STATE_ALERT, STATE_ERROR };
@@ -53,80 +78,56 @@ static AppState    currentState = STATE_CONNECTING;
 static EventData   currentEvent = { "", "", 5, false };
 static unsigned long lastPollMs  = 0;
 static bool        firstPoll    = true;
+
+// ---- Time sync ----
 static time_t      syncedEpoch  = 0;
 static unsigned long syncedMillis = 0;
 
-// ---- Render timing ----
-static unsigned long lastRenderMs = 0;
+// ---- Animation ----
+static unsigned long lastRenderMs  = 0;
+static bool          blinking      = false;
+static unsigned long blinkStart    = 0;
+static unsigned long nextBlinkAt   = 3000;
+static int           waveIdx       = 0;
+static unsigned long lastWaveFrame = 0;
 
-// ========== PALETA RGB565 ==========
-#define BG_COLOR    0x1926
-#define COL_BLACK   0x0000
-#define COL_BODY    0xE504
-#define COL_STRIPE  0xB380
-#define COL_CREAM   0xF71B
-#define COL_PINK    0xEB2D
-#define TEXT_COLOR  0xFFFF
-#define TEXT_DIM    0x9CF3
-#define ALERT_COLOR 0xFD20
-#define ALERT_BG    0x6180
+#define BLINK_INTERVAL  5000
+#define BLINK_DUR_MS    200
+#define WAVE_FRAME_MS   300
+#define RENDER_INTERVAL 33   // ~30 fps
 
-const uint16_t PALETTE[] = { BG_COLOR, COL_BLACK, COL_BODY, COL_STRIPE, COL_CREAM, COL_PINK };
+// ========== RENDER ==========
 
-// ========== PIXEL ART: 16x21 ==========
-#define CAT_W 16
-#define CAT_H 21
-#define SCALE 5
+static void drawCatFrame(int ox, int oy, int frameIdx) {
+    for (int y = 0; y < CAT_FRAME_H; y++) {
+        for (int x = 0; x < CAT_FRAME_W; x++) {
+            uint16_t p = pgm_read_word(&cat_frames[frameIdx][y * CAT_FRAME_W + x]);
+            if (p == CAT_TRANSPARENT) continue;
+            fb.drawPixel(ox + x, oy + y, p);
+        }
+    }
+}
 
-// Idle — olhos relaxados
-const uint8_t CAT_IDLE[21][16] = {
-    {0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0},
-    {0,0,1,2,2,1,0,0,0,0,1,2,2,1,0,0},
-    {0,0,1,5,2,2,1,1,1,1,2,2,5,1,0,0},
-    {0,1,2,2,3,2,2,2,2,2,2,3,2,2,1,0},
-    {0,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0},
-    {0,1,3,2,1,1,2,2,2,2,1,1,2,3,1,0},  // olhos 2px
-    {0,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0},
-    {0,1,2,2,2,4,4,4,4,4,4,2,2,2,1,0},
-    {1,0,1,3,2,4,4,5,5,4,4,2,3,1,0,1},
-    {0,0,1,2,2,4,1,4,1,4,2,2,1,0,0,0},
-    {1,0,0,1,2,2,4,4,4,2,2,1,0,0,1,0},
-    {0,0,0,0,1,2,2,2,2,2,2,1,0,0,0,0},
-    {0,0,0,1,2,3,2,4,2,3,2,2,1,0,0,0},
-    {0,0,1,2,2,2,3,4,3,2,2,2,2,1,0,0},
-    {0,1,4,1,2,2,2,4,2,2,2,2,1,4,1,0},
-    {0,1,4,1,2,2,2,4,2,2,2,2,1,4,1,0},
-    {0,0,1,2,2,2,2,4,2,2,2,2,2,1,0,0},
-    {0,0,1,2,2,2,2,2,2,2,2,2,2,1,1,0},
-    {0,0,1,1,2,1,1,2,1,1,2,1,1,2,2,1},
-    {0,0,0,1,1,0,0,1,0,0,1,0,0,1,2,1},
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0},
-};
+static void drawGround() {
+    int groundY = CAT_OY + CAT_FRAME_H + 4;
+    fb.fillRect(0, groundY, SCREEN_W, SCREEN_H - groundY, COL_GROUND);
+    fb.drawFastHLine(0, groundY - 1, SCREEN_W, 0x4082);
+    for (int x = 0; x < SCREEN_W; x += 6) {
+        fb.fillRect(x, groundY + 1, 1, 2, COL_GROUND_HI);
+    }
+    // sombra do gato
+    int shadowMargin = CAT_FRAME_W / 8;
+    fb.fillRect(CAT_OX + shadowMargin, groundY - 2,
+                CAT_FRAME_W - 2 * shadowMargin, 2, COL_SHADOW);
+}
 
-// Alert — olhos arregalados, boca aberta
-const uint8_t CAT_ALERT[21][16] = {
-    {0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0},  // orelhas mais altas
-    {0,1,2,2,1,0,0,0,0,0,0,1,2,2,1,0},
-    {0,1,5,2,2,1,1,1,1,1,1,2,2,5,1,0},
-    {0,1,2,2,3,2,2,2,2,2,2,3,2,2,1,0},
-    {0,1,2,2,2,2,2,2,2,2,2,2,2,2,1,0},
-    {0,1,3,1,1,1,2,2,2,1,1,1,2,3,1,0},  // olhos 3px (arregalados)
-    {0,1,2,2,4,1,2,2,2,4,1,2,2,2,1,0},  // brilho nos olhos
-    {0,1,2,2,2,4,4,4,4,4,4,2,2,2,1,0},
-    {1,0,1,3,2,4,4,5,5,4,4,2,3,1,0,1},
-    {0,0,1,2,2,4,4,1,4,4,2,2,1,0,0,0},  // boca aberta
-    {1,0,0,1,2,2,4,4,4,2,2,1,0,0,1,0},
-    {0,0,0,0,1,2,2,2,2,2,2,1,0,0,0,0},
-    {0,0,0,1,2,3,2,4,2,3,2,2,1,0,0,0},
-    {0,0,1,2,2,2,3,4,3,2,2,2,2,1,0,0},
-    {0,1,4,1,2,2,2,4,2,2,2,2,1,4,1,0},
-    {0,1,4,1,2,2,2,4,2,2,2,2,1,4,1,0},
-    {0,0,1,2,2,2,2,4,2,2,2,2,2,1,0,0},
-    {0,0,1,2,2,2,2,2,2,2,2,2,2,1,1,0},
-    {0,0,1,1,2,1,1,2,1,1,2,1,1,2,2,1},
-    {0,0,0,1,1,0,0,1,0,0,1,0,0,1,2,1},
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0},
-};
+static void drawTimeBar() {
+    fb.setTextDatum(TC_DATUM);
+    fb.setTextColor(TEXT_WHITE);
+    fb.drawString(stateGetTimeStr(), CX, 10, 6);
+    fb.setTextColor(TEXT_DIM);
+    fb.drawString(stateGetDateStr(), CX, 58, 4);
+}
 
 // ========== NETWORK ==========
 
@@ -193,28 +194,6 @@ time_t parseISO(const String& iso) {
     return mktime(&t) - _timezone;
 }
 
-void stateSyncTime(const String& isoTime) {
-    syncedEpoch  = parseISO(isoTime);
-    syncedMillis = millis();
-    Serial.printf("[time] synced to epoch %ld\n", (long)syncedEpoch);
-}
-
-void stateSetEvent(const String& eventJson) {
-    if (eventJson.isEmpty()) {
-        currentEvent.valid = false;
-        return;
-    }
-    JsonDocument doc;
-    if (deserializeJson(doc, eventJson)) {
-        currentEvent.valid = false;
-        return;
-    }
-    currentEvent.title              = doc["title"].as<String>();
-    currentEvent.startsAt           = doc["startsAt"].as<String>();
-    currentEvent.alertMinutesBefore = doc["alertMinutesBefore"] | 5;
-    currentEvent.valid              = true;
-}
-
 String stateGetTimeStr() {
     time_t t = currentEpoch();
     if (t == 0) return "--:--";
@@ -240,12 +219,33 @@ int stateMinutesUntilEvent() {
     return (int)((event - now) / 60);
 }
 
+void stateSyncTime(const String& isoTime) {
+    syncedEpoch  = parseISO(isoTime);
+    syncedMillis = millis();
+    Serial.printf("[time] synced to epoch %ld\n", (long)syncedEpoch);
+}
+
+void stateSetEvent(const String& eventJson) {
+    if (eventJson.isEmpty()) {
+        currentEvent.valid = false;
+        return;
+    }
+    JsonDocument doc;
+    if (deserializeJson(doc, eventJson)) {
+        currentEvent.valid = false;
+        return;
+    }
+    currentEvent.title              = doc["title"].as<String>();
+    currentEvent.startsAt           = doc["startsAt"].as<String>();
+    currentEvent.alertMinutesBefore = doc["alertMinutesBefore"] | 5;
+    currentEvent.valid              = true;
+}
+
 void stateUpdate() {
     if (!networkIsConnected()) {
         if (currentState != STATE_CONNECTING) currentState = STATE_CONNECTING;
         return;
     }
-
     if (currentState == STATE_CONNECTING) {
         currentState = STATE_IDLE;
         Serial.println("[state] connected");
@@ -255,7 +255,6 @@ void stateUpdate() {
     if (firstPoll || (now - lastPollMs >= POLL_INTERVAL_MS)) {
         firstPoll = false;
         lastPollMs = now;
-
         String eventJson, serverTime;
         if (networkPoll(eventJson, serverTime)) {
             stateSyncTime(serverTime);
@@ -281,94 +280,98 @@ void stateUpdate() {
     }
 }
 
-// ========== RENDER ==========
-
-void drawBitmap(const uint8_t bitmap[][16], int ox, int oy) {
-    for (int row = 0; row < CAT_H; row++) {
-        for (int col = 0; col < CAT_W; col++) {
-            uint8_t idx = bitmap[row][col];
-            if (idx != 0) {
-                sprite.fillRect(ox + col * SCALE, oy + row * SCALE,
-                                SCALE, SCALE, PALETTE[idx]);
-            }
-        }
-    }
-}
+// ========== RENDER FRAMES ==========
 
 void renderFrame() {
-    sprite.fillSprite(BG_COLOR);
+    unsigned long now = millis();
+    fb.fillSprite(COL_BG);
 
-    int ox = (W - CAT_W * SCALE) / 2;
+    // ---- Determine animation frame ----
+    int frameIdx = 0;
 
-    if (currentState == STATE_CONNECTING) {
-        drawBitmap(CAT_IDLE, ox, 100);
-        sprite.setTextDatum(TC_DATUM);
-        sprite.setTextColor(TEXT_DIM);
-        sprite.drawString("Conectando WiFi", CX, 40, 4);
-        int dots = (millis() / 500) % 4;
-        String d = "";
-        for (int i = 0; i < dots; i++) d += ".";
-        sprite.drawString(d, CX, 68, 4);
-        sprite.pushSprite(0, 0);
-        return;
+    switch (currentState) {
+        case STATE_CONNECTING:
+            frameIdx = 0;
+            // Texto
+            fb.setTextDatum(TC_DATUM);
+            fb.setTextColor(TEXT_DIM);
+            fb.drawString("Conectando WiFi", CX, 20, 4);
+            {
+                int dots = (now / 500) % 4;
+                String d = "";
+                for (int i = 0; i < dots; i++) d += ".";
+                fb.drawString(d, CX, 48, 4);
+            }
+            break;
+
+        case STATE_ERROR:
+            frameIdx = 1;  // olhos fechados
+            fb.setTextDatum(TC_DATUM);
+            fb.setTextColor(ALERT_COLOR);
+            fb.drawString("Erro de conexao", CX, 10, 4);
+            fb.setTextColor(TEXT_DIM);
+            fb.drawString("Tentando novamente...", CX, 40, 2);
+            break;
+
+        case STATE_ALERT:
+            // Acenando — cicla frames 2-3
+            if (now - lastWaveFrame >= WAVE_FRAME_MS) {
+                waveIdx = (waveIdx + 1) % 2;
+                lastWaveFrame = now;
+            }
+            frameIdx = 2 + waveIdx;
+            drawTimeBar();
+            break;
+
+        case STATE_IDLE:
+        default:
+            // Piscar
+            if (!blinking && now >= nextBlinkAt) { blinking = true; blinkStart = now; }
+            if (blinking && now - blinkStart >= BLINK_DUR_MS) {
+                blinking = false;
+                nextBlinkAt = now + BLINK_INTERVAL;
+            }
+            frameIdx = blinking ? 1 : 0;
+            drawTimeBar();
+            break;
     }
 
-    if (currentState == STATE_ERROR) {
-        drawBitmap(CAT_ALERT, ox, 100);
-        sprite.setTextDatum(TC_DATUM);
-        sprite.setTextColor(ALERT_COLOR);
-        sprite.drawString("Erro de conexao", CX, 40, 4);
-        sprite.setTextColor(TEXT_DIM);
-        sprite.drawString("Tentando novamente...", CX, 68, 2);
-        sprite.pushSprite(0, 0);
-        return;
-    }
+    // ---- Chao + sombra ----
+    drawGround();
 
-    // --- Hora e data ---
-    sprite.setTextDatum(TC_DATUM);
-    sprite.setTextColor(TEXT_COLOR);
-    sprite.drawString(stateGetTimeStr(), CX, 14, 6);
-    sprite.setTextColor(TEXT_DIM);
-    sprite.drawString(stateGetDateStr(), CX, 62, 4);
+    // ---- Gatinho ----
+    drawCatFrame(CAT_OX, CAT_OY, frameIdx);
 
-    // --- Gatinho ---
-    int oy = 90;
-    if (currentState == STATE_ALERT) {
-        drawBitmap(CAT_ALERT, ox, oy);
-    } else {
-        drawBitmap(CAT_IDLE, ox, oy);
-    }
-
-    // --- Info do evento ---
-    int bottomY = oy + CAT_H * SCALE + 10;
+    // ---- Info do evento (abaixo do chao) ----
+    int infoY = CAT_OY + CAT_FRAME_H + 10;
 
     if (currentState == STATE_ALERT) {
         int mins = stateMinutesUntilEvent();
 
-        sprite.fillRoundRect(8, bottomY, W - 16, 70, 8, ALERT_BG);
+        fb.fillRoundRect(6, infoY, SCREEN_W - 12, 60, 6, ALERT_BG);
 
-        sprite.setTextDatum(TC_DATUM);
-        sprite.setTextColor(ALERT_COLOR);
-        sprite.drawString("! EVENTO !", CX, bottomY + 8, 2);
+        fb.setTextDatum(TC_DATUM);
+        fb.setTextColor(ALERT_COLOR);
+        fb.drawString("! EVENTO !", CX, infoY + 6, 2);
 
-        sprite.setTextColor(TEXT_COLOR);
+        fb.setTextColor(TEXT_WHITE);
         String title = currentEvent.title;
         if (title.length() > 18) title = title.substring(0, 16) + "..";
-        sprite.drawString(title, CX, bottomY + 28, 4);
+        fb.drawString(title, CX, infoY + 22, 4);
 
-        sprite.setTextColor(TEXT_DIM);
+        fb.setTextColor(TEXT_DIM);
         String countdown;
         if (mins <= 0)      countdown = "Agora!";
         else if (mins == 1) countdown = "em 1 min";
         else                countdown = "em " + String(mins) + " min";
-        sprite.drawString(countdown, CX, bottomY + 52, 2);
-    } else {
-        sprite.setTextDatum(TC_DATUM);
-        sprite.setTextColor(TEXT_DIM);
-        sprite.drawString("Sem eventos proximos", CX, bottomY + 20, 2);
+        fb.drawString(countdown, CX, infoY + 44, 2);
+    } else if (currentState == STATE_IDLE) {
+        fb.setTextDatum(TC_DATUM);
+        fb.setTextColor(TEXT_DIM);
+        fb.drawString("Sem eventos proximos", CX, infoY + 15, 2);
     }
 
-    sprite.pushSprite(0, 0);
+    fb.pushSprite(0, 0);
 }
 
 // ========== SETUP & LOOP ==========
@@ -378,16 +381,17 @@ void setup() {
     Serial.println("\n[gatinho-pet] booting...");
 
     // Display
-    tft.init();
-    tft.setRotation(0);
-    tft.fillScreen(BG_COLOR);
-    pinMode(TFT_BL, OUTPUT);
-    digitalWrite(TFT_BL, TFT_BACKLIGHT_ON);
-    sprite.createSprite(W, H);
-    sprite.setSwapBytes(true);
+    pinMode(LCD_POWER_PIN, OUTPUT); digitalWrite(LCD_POWER_PIN, HIGH);
+    pinMode(LCD_BL_PIN,    OUTPUT); digitalWrite(LCD_BL_PIN,    HIGH);
 
-    // State
-    currentState = STATE_CONNECTING;
+    tft.init();
+    tft.setRotation(0);  // portrait 170x320
+    tft.fillScreen(COL_BG);
+
+    fb.setColorDepth(16);
+    fb.createSprite(SCREEN_W, SCREEN_H);
+
+    // Time
     setenv("TZ", "UTC0", 1);
     tzset();
 
@@ -403,7 +407,7 @@ void loop() {
     stateUpdate();
 
     unsigned long now = millis();
-    if (now - lastRenderMs >= 1000) {
+    if (now - lastRenderMs >= RENDER_INTERVAL) {
         lastRenderMs = now;
         renderFrame();
     }
