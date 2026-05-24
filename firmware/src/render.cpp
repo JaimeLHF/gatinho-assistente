@@ -14,11 +14,11 @@ static const int CX = W / 2;
 static const int SCALE = 1;
 
 // ---- Colors (RGB565 native — sem swap, sem inversao) ----
-static const uint16_t COL_BG        = 0xCEFB;  // warm bege
+static const uint16_t COL_BG        = 0x3186;  // cinza chumbo escuro
 static const uint16_t COL_GROUND    = 0x6BC4;  // earthy olive
 static const uint16_t COL_GROUND_HI = 0x8C68;  // ground highlight
-static const uint16_t COL_SHADOW    = 0x528A;  // subtle shadow
-static const uint16_t COL_TEXT      = 0x3186;  // dark gray
+static const uint16_t COL_SHADOW    = 0x18E3;  // sombra mais sutil
+static const uint16_t COL_TEXT      = 0xE73C;  // off-white pra contraste
 static const uint16_t COL_TEXT_DIM  = 0x7BCF;  // medium gray
 static const uint16_t COL_ALERT_FG  = 0xF800;  // red
 static const uint16_t COL_HEART     = 0xFB14;  // heart pink
@@ -79,14 +79,10 @@ static void drawButterflyFrame(int ox, int oy, int frameIdx) {
 }
 
 static void drawScene() {
-    // Ground strip at bottom
-    fb.fillRect(0, H - 8, W, 8, COL_GROUND);
-    // Ground highlight line
-    fb.drawFastHLine(0, H - 8, W, COL_GROUND_HI);
-    // Shadow ellipse under cat
+    // Shadow ellipse under cat (acompanha breathing)
     int sx = CAT_OX + (CAT_FRAME_W * SCALE) / 2;
-    int sy = CAT_OY + CAT_FRAME_H * SCALE + 4;
-    fb.fillEllipse(sx, sy, 28, 4, COL_SHADOW);
+    int sy = CAT_OY + 96;  // fixa no chão, gato respira por cima
+    fb.fillEllipse(sx, sy, 24, 3, COL_SHADOW);
 }
 
 // ---- State screens ----
@@ -207,7 +203,7 @@ void renderFrame(AppState state) {
     }
 
     fb.fillSprite(COL_BG);
-    drawScene();
+    if (frame != CAT_FRAME_SLEEP) drawScene();
     drawCatFrame(CAT_OX, CAT_OY + bob, frame);
     fb.pushSprite(0, 0);
 }
