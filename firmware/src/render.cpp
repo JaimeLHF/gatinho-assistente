@@ -24,9 +24,14 @@ static const uint16_t COL_ALERT_FG  = 0xF800;  // red
 static const uint16_t COL_HEART     = 0xFB14;  // heart pink
 static const uint16_t COL_HEART_HI  = 0xFD9F;  // heart highlight
 
-// Cat position: centered horizontally, vertically centered +4px
-static const int CAT_OX = (W - CAT_FRAME_W * SCALE) / 2;
+// Cat position: left side, vertically centered +4px
+static const int CAT_OX = 30;
 static const int CAT_OY = (H - CAT_FRAME_H * SCALE) / 2 + 4;
+
+// Text area: right side of the cat
+static const int TEXT_AREA_X  = 120;
+static const int TEXT_AREA_W  = W - 120 - 8;
+static const int TEXT_AREA_CX = TEXT_AREA_X + TEXT_AREA_W / 2;
 
 // ---- Buttons ----
 static const int BTN_BOOT = 0;   // GPIO 0 (BOOT)
@@ -48,6 +53,48 @@ static bool wasSleeping    = false;
 static unsigned long yawnEndMs = 0;
 static const unsigned long YAWN_DURATION_MS = 1500;
 
+// ---- Butterflies ----
+static const int MAX_BUTTERFLIES = 2;
+static const unsigned long BTF_FLAP_MS    = 140;
+static const unsigned long BTF_SPAWN_MIN  = 30000;
+static const unsigned long BTF_SPAWN_MAX  = 80000;
+
+struct Butterfly {
+    float x;
+    float baseY;
+    float vx;
+    uint16_t age;
+    bool active;
+};
+static Butterfly btfs[MAX_BUTTERFLIES];
+static unsigned long nextBtfAt = 0;
+
+// ---- Zzz ----
+static const int MAX_ZS = 4;
+static const int Z_SCALE = 1;
+static const unsigned long Z_SPAWN_MS = 1400;
+
+static const uint8_t Z_BITMAP[9][9] = {
+    {1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1},
+    {0,0,0,0,0,0,1,1,0},
+    {0,0,0,0,0,1,1,0,0},
+    {0,0,0,0,1,1,0,0,0},
+    {0,0,0,1,1,0,0,0,0},
+    {0,0,1,1,0,0,0,0,0},
+    {1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1},
+};
+
+struct Zzz {
+    float x, y;
+    float vx, vy;
+    uint16_t age;
+    bool active;
+};
+static Zzz zzs[MAX_ZS];
+static unsigned long lastZSpawn = 0;
+
 // ---- Drawing helpers (pixel-a-pixel, sem pushImage, sem setSwapBytes) ----
 
 static void drawCatFrame(int ox, int oy, int frameIdx) {
@@ -64,17 +111,95 @@ static void drawCatFrame(int ox, int oy, int frameIdx) {
     }
 }
 
-static void drawButterflyFrame(int ox, int oy, int frameIdx) {
-    for (int y = 0; y < BTF_FRAME_H; y++) {
-        for (int x = 0; x < BTF_FRAME_W; x++) {
-            uint16_t p = pgm_read_word(&btf_frames[frameIdx][y * BTF_FRAME_W + x]);
+// Draw butterfly scaled down (~75%)
+static const int BTF_DRAW_W = BTF_FRAME_W * 3 / 4;
+static const int BTF_DRAW_H = BTF_FRAME_H * 3 / 4;
+
+static void drawButterflyFrame(int ox, int oy, int frameIdx, bool flip) {
+    for (int dy = 0; dy < BTF_DRAW_H; dy++) {
+        int sy = dy * BTF_FRAME_H / BTF_DRAW_H;
+        for (int dx = 0; dx < BTF_DRAW_W; dx++) {
+            int sx = dx * BTF_FRAME_W / BTF_DRAW_W;
+            uint16_t p = pgm_read_word(&btf_frames[frameIdx][sy * BTF_FRAME_W + sx]);
             if (p == BTF_TRANSPARENT) continue;
-            if (SCALE == 1) {
-                fb.drawPixel(ox + x, oy + y, p);
-            } else {
-                fb.fillRect(ox + x * SCALE, oy + y * SCALE, SCALE, SCALE, p);
-            }
+            int px = flip ? (BTF_DRAW_W - 1 - dx) : dx;
+            fb.drawPixel(ox + px, oy + dy, p);
         }
+    }
+}
+
+// ---- Butterfly spawn/update/draw ----
+
+static void spawnButterfly() {
+    for (int i = 0; i < MAX_BUTTERFLIES; i++) {
+        if (!btfs[i].active) {
+            bool fromLeft = random(2);
+            btfs[i].active = true;
+            btfs[i].x     = fromLeft ? (float)-BTF_DRAW_W : (float)(W + 5);
+            btfs[i].baseY  = -20.0f + random(0, 80);
+            btfs[i].vx    = (fromLeft ? 1.0f : -1.0f) * (0.4f + random(0, 30) * 0.01f);
+            btfs[i].age   = 0;
+            return;
+        }
+    }
+}
+
+static void updateAndDrawButterflies() {
+    const int framesPerFlap = BTF_FLAP_MS / 16;
+    for (int i = 0; i < MAX_BUTTERFLIES; i++) {
+        if (!btfs[i].active) continue;
+        btfs[i].x += btfs[i].vx;
+        btfs[i].age++;
+        if (btfs[i].x < -BTF_DRAW_W - 5 || btfs[i].x > W + 5) {
+            btfs[i].active = false;
+            continue;
+        }
+        int yOsc = (int)(sinf(btfs[i].age * 0.06f) * 10.0f);
+        int y = (int)btfs[i].baseY + yOsc;
+        int frameIdx = (btfs[i].age / framesPerFlap) % 2;
+        bool flip = (btfs[i].vx > 0);
+        drawButterflyFrame((int)btfs[i].x, y, frameIdx, flip);
+    }
+}
+
+// ---- Zzz spawn/update/draw ----
+
+static void spawnZ(int headX, int headY) {
+    for (int i = 0; i < MAX_ZS; i++) {
+        if (!zzs[i].active) {
+            zzs[i].active = true;
+            zzs[i].x  = headX + random(-6, 7);
+            zzs[i].y  = headY;
+            zzs[i].vx = random(-10, 11) * 0.02f;
+            zzs[i].vy = -0.4f - random(0, 30) * 0.01f;
+            zzs[i].age = 0;
+            return;
+        }
+    }
+}
+
+static void drawZ(int x, int y) {
+    for (int row = 0; row < 9; row++) {
+        for (int col = 0; col < 9; col++) {
+            if (!Z_BITMAP[row][col]) continue;
+            fb.fillRect(x + col * Z_SCALE, y + row * Z_SCALE,
+                        Z_SCALE, Z_SCALE, COL_TEXT);
+        }
+    }
+}
+
+static void updateAndDrawZs() {
+    for (int i = 0; i < MAX_ZS; i++) {
+        if (!zzs[i].active) continue;
+        zzs[i].x += zzs[i].vx;
+        zzs[i].y += zzs[i].vy;
+        zzs[i].age++;
+        float wx = sinf(zzs[i].age * 0.06f) * 1.2f;
+        if (zzs[i].y < -16 || zzs[i].x > W + 10) {
+            zzs[i].active = false;
+            continue;
+        }
+        drawZ((int)(zzs[i].x + wx), (int)zzs[i].y);
     }
 }
 
@@ -94,12 +219,12 @@ static void drawConnecting() {
 
     fb.setTextDatum(TC_DATUM);
     fb.setTextColor(COL_TEXT_DIM, COL_BG);
-    fb.drawString("Conectando WiFi", CX, 8, 2);
+    fb.drawString("Conectando WiFi", TEXT_AREA_CX, 50, 2);
 
     int dots = (millis() / 500) % 4;
     String d = "";
     for (int i = 0; i < dots; i++) d += ".";
-    fb.drawString(d, CX, 24, 2);
+    fb.drawString(d, TEXT_AREA_CX, 70, 2);
 }
 
 static void drawError() {
@@ -109,9 +234,9 @@ static void drawError() {
 
     fb.setTextDatum(TC_DATUM);
     fb.setTextColor(COL_ALERT_FG, COL_BG);
-    fb.drawString("Erro de conexao", CX, 8, 2);
+    fb.drawString("Erro de conexao", TEXT_AREA_CX, 50, 2);
     fb.setTextColor(COL_TEXT_DIM, COL_BG);
-    fb.drawString("Tentando novamente...", CX, 24, 2);
+    fb.drawString("Tentando novamente...", TEXT_AREA_CX, 70, 2);
 }
 
 // ---- Public API ----
@@ -175,6 +300,10 @@ void renderSetup() {
     // Init animation timers
     lastInteraction = millis();
     nextBlinkMs = millis() + 3000 + random(4000);
+    nextBtfAt = millis() + random(2000, 6000);
+    for (int i = 0; i < MAX_BUTTERFLIES; i++) btfs[i].active = false;
+    for (int i = 0; i < MAX_ZS; i++) zzs[i].active = false;
+    randomSeed(esp_random());
 }
 
 void renderFrame(AppState state) {
@@ -195,15 +324,48 @@ void renderFrame(AppState state) {
     // IDLE or ALERT
     unsigned long now = millis();
     int frame = chooseCatFrame(now, state);
+    bool sleeping = (frame == CAT_FRAME_SLEEP);
+
+    // Spawn butterflies periodically
+    if (now >= nextBtfAt) {
+        spawnButterfly();
+        nextBtfAt = now + random(BTF_SPAWN_MIN, BTF_SPAWN_MAX);
+    }
+
+    // Spawn Zzz when sleeping
+    if (sleeping && (now - lastZSpawn >= Z_SPAWN_MS)) {
+        int headX = CAT_OX + CAT_FRAME_W / 2 - (9 * Z_SCALE) / 2;
+        int headY = CAT_OY + CAT_FRAME_H / 4;
+        spawnZ(headX, headY);
+        lastZSpawn = now;
+    }
 
     // Breathing bob when sleeping (sin wave, ~1-2px vertical)
     int bob = 0;
-    if (frame == CAT_FRAME_SLEEP) {
+    if (sleeping) {
         bob = (int)(sinf(now * 0.0018f) * 2.0f);
     }
 
     fb.fillSprite(COL_BG);
-    if (frame != CAT_FRAME_SLEEP) drawScene();
+
+    // Butterflies behind cat
+    updateAndDrawButterflies();
+
+    if (!sleeping) drawScene();
     drawCatFrame(CAT_OX, CAT_OY + bob, frame);
+
+    // Zzz in front of cat
+    updateAndDrawZs();
+
+    // Alert text overlay
+    if (state == STATE_ALERT) {
+        EventData ev = stateGetEvent();
+        if (ev.valid && ev.title.length() > 0) {
+            fb.setTextDatum(TC_DATUM);
+            fb.setTextColor(COL_ALERT_FG, COL_BG);
+            fb.drawString(ev.title, TEXT_AREA_CX, 30, 4);
+        }
+    }
+
     fb.pushSprite(0, 0);
 }
