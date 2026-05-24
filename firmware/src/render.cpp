@@ -1,5 +1,7 @@
 #include "render.h"
 #include "state.h"
+#include "sprites/frames.h"
+#include "sprites/butterfly.h"
 
 static TFT_eSPI tft;
 static TFT_eSprite sprite(&tft);
