@@ -1,6 +1,8 @@
 #include "network.h"
 #include "config.h"
 #include "wifi_config.h"
+#include "render.h"
+#include "state.h"
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -9,11 +11,41 @@
 void networkSetup() {
     wifiConfigBegin();
     WiFi.mode(WIFI_STA);
-    WiFi.begin(wifiConfigGetSSID().c_str(), wifiConfigGetPassword().c_str());
-    Serial.print("[wifi] connecting");
+    String ssid = wifiConfigGetSSID();
+    String pwd  = wifiConfigGetPassword();
+    WiFi.begin(ssid.c_str(), pwd.c_str());
+    Serial.printf("[wifi] connecting to '%s'", ssid.c_str());
+
+    unsigned long startMs = millis();
+    unsigned long lastDotMs = 0;
+    while (WiFi.status() != WL_CONNECTED) {
+        unsigned long now = millis();
+        if (now - startMs > 25000) {
+            Serial.println("\n[wifi] Timeout 25s, marcando needsWiFiSetup");
+            g_needsWiFiSetup = true;
+            break;
+        }
+        if (now - lastDotMs >= 500) {
+            Serial.print(".");
+            lastDotMs = now;
+        }
+        renderFrame(STATE_CONNECTING);
+        delay(33);
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        g_needsWiFiSetup = false;
+        Serial.printf("\n[wifi] Conectado em %lums, IP: %s\n",
+                       millis() - startMs, WiFi.localIP().toString().c_str());
+    }
 }
 
 bool networkIsConnected() {
+    // Se reconectou depois do timeout, limpa a flag
+    if (g_needsWiFiSetup && WiFi.status() == WL_CONNECTED) {
+        g_needsWiFiSetup = false;
+        Serial.println("[wifi] Reconectou depois do timeout");
+    }
     return WiFi.status() == WL_CONNECTED;
 }
 

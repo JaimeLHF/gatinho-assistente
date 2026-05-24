@@ -1,6 +1,8 @@
 #include "render.h"
 #include "state.h"
 #include "time_sync.h"
+#include "wifi_portal.h"
+#include "button_reset.h"
 #include "sprites/frames.h"
 #include "sprites/butterfly.h"
 #include <math.h>
@@ -98,15 +100,16 @@ static unsigned long lastZSpawn = 0;
 
 // ---- Drawing helpers (pixel-a-pixel, sem pushImage, sem setSwapBytes) ----
 
-static void drawCatFrame(int ox, int oy, int frameIdx) {
+static void drawCatFrame(int ox, int oy, int frameIdx, bool flip = false) {
     for (int y = 0; y < CAT_FRAME_H; y++) {
         for (int x = 0; x < CAT_FRAME_W; x++) {
             uint16_t p = pgm_read_word(&cat_frames[frameIdx][y * CAT_FRAME_W + x]);
             if (p == CAT_TRANSPARENT) continue;
+            int dx = flip ? (CAT_FRAME_W - 1 - x) : x;
             if (SCALE == 1) {
-                fb.drawPixel(ox + x, oy + y, p);
+                fb.drawPixel(ox + dx, oy + y, p);
             } else {
-                fb.fillRect(ox + x * SCALE, oy + y * SCALE, SCALE, SCALE, p);
+                fb.fillRect(ox + dx * SCALE, oy + y * SCALE, SCALE, SCALE, p);
             }
         }
     }
@@ -228,6 +231,17 @@ static void drawConnecting() {
     fb.drawString(d, TEXT_AREA_CX, 70, 2);
 }
 
+static void drawResetHint() {
+    // Texto à direita + seta apontando pro botão BOOT (canto inferior direito)
+    fb.setTextDatum(TR_DATUM);
+    fb.setTextColor(COL_TEXT_DIM, COL_BG);
+    int ty = H - 20;
+    int tx = W - 16;
+    fb.drawString("Aguarde ou segure 10s p/ reconfig.", tx, ty, 2);
+    int ax = W - 8, ay = ty + 8;
+    fb.fillTriangle(ax + 7, ay, ax + 1, ay - 5, ax + 1, ay + 5, COL_TEXT_DIM);
+}
+
 static void drawError() {
     fb.fillSprite(COL_BG);
     drawScene();
@@ -238,6 +252,82 @@ static void drawError() {
     fb.drawString("Erro de conexao", TEXT_AREA_CX, 50, 2);
     fb.setTextColor(COL_TEXT_DIM, COL_BG);
     fb.drawString("Tentando novamente...", TEXT_AREA_CX, 70, 2);
+
+    drawResetHint();
+}
+
+static const uint16_t COL_RESET_BG = 0xC000;  // vermelho escuro
+static const uint16_t COL_RESET_BAR = 0xF800; // vermelho
+
+static void drawResetOverlay() {
+    if (g_resetPressMs < 3000) return;
+
+    int secsLeft = (int)((10000 - g_resetPressMs) / 1000) + 1;
+    if (secsLeft < 0) secsLeft = 0;
+
+    // Barra de progresso no topo
+    float progress = (float)(g_resetPressMs - 3000) / 7000.0f;
+    if (progress > 1.0f) progress = 1.0f;
+    int barW = (int)(W * progress);
+    fb.fillRect(0, 0, barW, 4, COL_RESET_BAR);
+
+    // Texto centralizado
+    fb.setTextDatum(TC_DATUM);
+    fb.setTextColor(COL_RESET_BAR, COL_BG);
+    fb.drawString("Resetar WiFi: " + String(secsLeft) + "s", CX, H - 20, 2);
+}
+
+static const int PORTAL_TEXT_X = 135;
+
+static void drawPortal() {
+    fb.fillSprite(COL_BG);
+    drawScene();
+    drawCatFrame(CAT_OX, CAT_OY, CAT_FRAME_IDLE, true);
+
+    int x = PORTAL_TEXT_X;
+    int y = 8;
+
+    fb.setTextDatum(TL_DATUM);
+    fb.setTextColor(COL_ALERT_FG, COL_BG);
+    fb.drawString("Configurar WiFi", x, y, 2);
+    y += 22;
+
+    fb.setTextColor(COL_TEXT_DIM, COL_BG);
+    fb.drawString("Rede:", x, y, 2);
+    y += 15;
+    fb.setTextColor(COL_TEXT, COL_BG);
+    fb.drawString(portalGetAPSSID(), x, y, 2);
+    y += 20;
+
+    fb.setTextColor(COL_TEXT_DIM, COL_BG);
+    fb.drawString("Senha:", x, y, 2);
+    y += 15;
+    fb.setTextColor(COL_TEXT, COL_BG);
+    fb.drawString(portalGetAPPassword(), x, y, 2);
+    y += 20;
+
+    fb.setTextColor(COL_TEXT_DIM, COL_BG);
+    fb.drawString("Abra no navegador:", x, y, 2);
+    y += 15;
+    fb.setTextColor(COL_TEXT, COL_BG);
+    fb.drawString(portalGetAPIP(), x, y, 2);
+}
+
+static void drawWifiRetry(int secsLeft) {
+    fb.fillSprite(COL_BG);
+    drawScene();
+    drawCatFrame(CAT_OX, CAT_OY, CAT_FRAME_ALERT);
+
+    int x = PORTAL_TEXT_X;
+    fb.setTextDatum(TL_DATUM);
+    fb.setTextColor(COL_ALERT_FG, COL_BG);
+    fb.drawString("Erro de conexao", x, 30, 4);
+    fb.setTextColor(COL_TEXT_DIM, COL_BG);
+    fb.drawString("Tente novamente em", x, 65, 2);
+    fb.setTextColor(COL_TEXT, COL_BG);
+    fb.drawString(String(secsLeft) + " segundos", x, 85, 2);
+
+    drawResetHint();
 }
 
 // ---- Public API ----
@@ -319,12 +409,21 @@ void renderFrame(AppState state) {
 
     if (state == STATE_CONNECTING) {
         drawConnecting();
+        drawResetOverlay();
+        fb.pushSprite(0, 0);
+        return;
+    }
+
+    if (state == STATE_PORTAL) {
+        drawPortal();
+        drawResetOverlay();
         fb.pushSprite(0, 0);
         return;
     }
 
     if (state == STATE_ERROR) {
         drawError();
+        drawResetOverlay();
         fb.pushSprite(0, 0);
         return;
     }
@@ -394,5 +493,12 @@ void renderFrame(AppState state) {
         }
     }
 
+    drawResetOverlay();
+    fb.pushSprite(0, 0);
+}
+
+void renderWifiRetry(int secsLeft) {
+    drawWifiRetry(secsLeft);
+    drawResetOverlay();
     fb.pushSprite(0, 0);
 }

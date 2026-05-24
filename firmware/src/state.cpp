@@ -41,6 +41,9 @@ void stateSetup() {
 }
 
 void stateUpdate() {
+    // Portal mode: skip all normal logic
+    if (currentState == STATE_PORTAL) return;
+
     // Handle WiFi connection state
     if (!networkIsConnected()) {
         if (currentState != STATE_CONNECTING) {
@@ -149,6 +152,11 @@ void stateDismissAlert() {
         currentState = STATE_IDLE;
         Serial.println("[state] alert dismissed");
     }
+}
+
+void stateForcePortal() {
+    currentState = STATE_PORTAL;
+    Serial.println("[state] Entrando em STATE_PORTAL");
 }
 
 int stateMinutesUntilEvent() {

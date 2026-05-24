@@ -5,3 +5,4 @@
 
 void renderSetup();
 void renderFrame(AppState state);
+void renderWifiRetry(int secsLeft);

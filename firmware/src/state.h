@@ -6,7 +6,8 @@ enum AppState {
     STATE_CONNECTING,
     STATE_IDLE,
     STATE_ALERT,
-    STATE_ERROR
+    STATE_ERROR,
+    STATE_PORTAL
 };
 
 struct EventData {
@@ -39,3 +40,6 @@ int stateMinutesUntilEvent();
 
 // Dismiss the current alert (won't re-trigger for this same event)
 void stateDismissAlert();
+
+// Force portal state (called when WiFi setup is needed)
+void stateForcePortal();
