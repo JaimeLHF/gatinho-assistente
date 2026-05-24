@@ -5,7 +5,7 @@
 #include "render.h"
 
 static unsigned long lastRenderMs = 0;
-static const unsigned long RENDER_INTERVAL_MS = 1000; // redraw every second
+static const unsigned long RENDER_INTERVAL_MS = 33; // ~30fps for smooth animations
 
 void setup() {
     Serial.begin(115200);
