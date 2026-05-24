@@ -36,3 +36,6 @@ String stateGetDateStr();
 
 // How many minutes until the event starts (negative = past)
 int stateMinutesUntilEvent();
+
+// Dismiss the current alert (won't re-trigger for this same event)
+void stateDismissAlert();

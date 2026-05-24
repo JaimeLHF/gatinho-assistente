@@ -9,6 +9,7 @@ static AppState    currentState = STATE_CONNECTING;
 static EventData   currentEvent = { "", "", 5, false };
 static unsigned long lastPollMs = 0;
 static bool        firstPoll   = true;
+static String      dismissedStartsAt = "";
 
 // Time sync: offset between server time and local millis
 static time_t      syncedEpoch    = 0;
@@ -72,11 +73,13 @@ void stateUpdate() {
     // Determine alert state
     if (currentEvent.valid) {
         int mins = stateMinutesUntilEvent();
-        if (mins >= 0 && mins <= currentEvent.alertMinutesBefore) {
+        if (mins >= 0 && mins <= currentEvent.alertMinutesBefore
+            && currentEvent.startsAt != dismissedStartsAt) {
             currentState = STATE_ALERT;
         } else if (mins < 0) {
             // Event passed, clear it
             currentEvent.valid = false;
+            dismissedStartsAt = "";
             currentState = STATE_IDLE;
         } else {
             currentState = STATE_IDLE;
@@ -85,6 +88,7 @@ void stateUpdate() {
         if (currentState == STATE_ALERT) {
             currentState = STATE_IDLE;
         }
+        dismissedStartsAt = "";
     }
 }
 
@@ -137,6 +141,14 @@ String stateGetDateStr() {
     char buf[6];
     snprintf(buf, sizeof(buf), "%02d/%02d", info->tm_mday, info->tm_mon + 1);
     return String(buf);
+}
+
+void stateDismissAlert() {
+    if (currentEvent.valid) {
+        dismissedStartsAt = currentEvent.startsAt;
+        currentState = STATE_IDLE;
+        Serial.println("[state] alert dismissed");
+    }
 }
 
 int stateMinutesUntilEvent() {

@@ -21,7 +21,7 @@ static const uint16_t COL_GROUND_HI = 0x8C68;  // ground highlight
 static const uint16_t COL_SHADOW    = 0x18E3;  // sombra mais sutil
 static const uint16_t COL_TEXT      = 0xE73C;  // off-white pra contraste
 static const uint16_t COL_TEXT_DIM  = 0x7BCF;  // medium gray
-static const uint16_t COL_ALERT_FG  = 0xF800;  // red
+static const uint16_t COL_ALERT_FG  = 0xFCC8;  // laranja suave
 static const uint16_t COL_HEART     = 0xFB14;  // heart pink
 static const uint16_t COL_HEART_HI  = 0xFD9F;  // heart highlight
 
@@ -243,10 +243,17 @@ static void drawError() {
 // ---- Public API ----
 
 // ---- Button reading ----
-static void updateButtons() {
-    if (digitalRead(BTN_BOOT) == LOW || digitalRead(BTN_KEY) == LOW) {
+static bool btnPressed = false;
+
+static void updateButtons(AppState appState) {
+    bool down = (digitalRead(BTN_BOOT) == LOW || digitalRead(BTN_KEY) == LOW);
+    if (down && !btnPressed) {
         lastInteraction = millis();
+        if (appState == STATE_ALERT) {
+            stateDismissAlert();
+        }
     }
+    btnPressed = down;
 }
 
 // ---- Determine which cat frame to show ----
@@ -308,7 +315,7 @@ void renderSetup() {
 }
 
 void renderFrame(AppState state) {
-    updateButtons();
+    updateButtons(state);
 
     if (state == STATE_CONNECTING) {
         drawConnecting();
@@ -362,13 +369,15 @@ void renderFrame(AppState state) {
     if (state == STATE_ALERT) {
         EventData ev = stateGetEvent();
         if (ev.valid && ev.title.length() > 0) {
+            String title = ev.title;
+            if (title.length() > 18) title = title.substring(0, 17) + "..";
             fb.setTextDatum(TC_DATUM);
             fb.setTextColor(COL_ALERT_FG, COL_BG);
-            fb.drawString(ev.title, TEXT_AREA_CX, 50, 4);
+            fb.drawString(title, TEXT_AREA_CX, 50, 4);
             int mins = stateMinutesUntilEvent();
             if (mins >= 0) {
                 fb.setTextColor(COL_TEXT, COL_BG);
-                fb.drawString("em " + String(mins) + " min", TEXT_AREA_CX, 80, 2);
+                fb.drawString(mins == 0 ? "Agora" : "em " + String(mins) + " min", TEXT_AREA_CX, 80, 2);
             }
         }
     } else {
