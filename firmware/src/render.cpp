@@ -2,6 +2,7 @@
 #include "state.h"
 #include "sprites/frames.h"
 #include "sprites/butterfly.h"
+#include <math.h>
 
 static TFT_eSPI tft;
 static TFT_eSprite fb(&tft);
@@ -26,6 +27,26 @@ static const uint16_t COL_HEART_HI  = 0xFD9F;  // heart highlight
 // Cat position: centered horizontally, vertically centered +4px
 static const int CAT_OX = (W - CAT_FRAME_W * SCALE) / 2;
 static const int CAT_OY = (H - CAT_FRAME_H * SCALE) / 2 + 4;
+
+// ---- Buttons ----
+static const int BTN_BOOT = 0;   // GPIO 0 (BOOT)
+static const int BTN_KEY  = 14;  // GPIO 14 (KEY)
+
+// ---- Animation state ----
+static unsigned long lastInteraction = 0;
+static const unsigned long SLEEP_TIMEOUT_MS = 30000;  // 30s
+
+// Blink
+static unsigned long nextBlinkMs = 0;
+static unsigned long blinkEndMs  = 0;
+static const unsigned long BLINK_DURATION_MS  = 500;
+static const unsigned long BLINK_INTERVAL_MIN = 3000;
+static const unsigned long BLINK_INTERVAL_MAX = 7000;
+
+// Yawn (rising edge: sleep → awake)
+static bool wasSleeping    = false;
+static unsigned long yawnEndMs = 0;
+static const unsigned long YAWN_DURATION_MS = 1500;
 
 // ---- Drawing helpers (pixel-a-pixel, sem pushImage, sem setSwapBytes) ----
 
@@ -99,6 +120,42 @@ static void drawError() {
 
 // ---- Public API ----
 
+// ---- Button reading ----
+static void updateButtons() {
+    if (digitalRead(BTN_BOOT) == LOW || digitalRead(BTN_KEY) == LOW) {
+        lastInteraction = millis();
+    }
+}
+
+// ---- Determine which cat frame to show ----
+static int chooseCatFrame(unsigned long now, AppState appState) {
+    // ALERT from API has highest priority
+    if (appState == STATE_ALERT) return CAT_FRAME_ALERT;
+
+    bool sleeping = (now - lastInteraction) >= SLEEP_TIMEOUT_MS;
+
+    // Detect rising edge: was sleeping, now awake → yawn
+    if (wasSleeping && !sleeping) {
+        yawnEndMs = now + YAWN_DURATION_MS;
+    }
+    wasSleeping = sleeping;
+
+    // Yawning (just woke up)
+    if (!sleeping && now < yawnEndMs) return CAT_FRAME_YAWN;
+
+    // Sleeping
+    if (sleeping) return CAT_FRAME_SLEEP;
+
+    // Blink timer
+    if (now < blinkEndMs) return CAT_FRAME_BLINK;
+    if (now >= nextBlinkMs) {
+        blinkEndMs = now + BLINK_DURATION_MS;
+        nextBlinkMs = now + BLINK_INTERVAL_MIN + (random(BLINK_INTERVAL_MAX - BLINK_INTERVAL_MIN));
+    }
+
+    return CAT_FRAME_IDLE;
+}
+
 void renderSetup() {
     // CRÍTICO: alimentar o painel LCD via GPIO 15
     pinMode(15, OUTPUT);
@@ -108,15 +165,25 @@ void renderSetup() {
     pinMode(TFT_BL, OUTPUT);
     digitalWrite(TFT_BL, TFT_BACKLIGHT_ON);
 
+    // Buttons
+    pinMode(BTN_BOOT, INPUT_PULLUP);
+    pinMode(BTN_KEY, INPUT_PULLUP);
+
     tft.init();
     tft.setRotation(1);  // landscape 320x170
     tft.fillScreen(COL_BG);
 
     fb.setColorDepth(16);
     fb.createSprite(W, H);
+
+    // Init animation timers
+    lastInteraction = millis();
+    nextBlinkMs = millis() + 3000 + random(4000);
 }
 
 void renderFrame(AppState state) {
+    updateButtons();
+
     if (state == STATE_CONNECTING) {
         drawConnecting();
         fb.pushSprite(0, 0);
@@ -130,8 +197,17 @@ void renderFrame(AppState state) {
     }
 
     // IDLE or ALERT
+    unsigned long now = millis();
+    int frame = chooseCatFrame(now, state);
+
+    // Breathing bob when sleeping (sin wave, ~1-2px vertical)
+    int bob = 0;
+    if (frame == CAT_FRAME_SLEEP) {
+        bob = (int)(sinf(now * 0.0018f) * 2.0f);
+    }
+
     fb.fillSprite(COL_BG);
     drawScene();
-    drawCatFrame(CAT_OX, CAT_OY, CAT_FRAME_IDLE);
+    drawCatFrame(CAT_OX, CAT_OY + bob, frame);
     fb.pushSprite(0, 0);
 }
