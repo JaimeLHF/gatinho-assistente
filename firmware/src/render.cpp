@@ -1,5 +1,6 @@
 #include "render.h"
 #include "state.h"
+#include "time_sync.h"
 #include "sprites/frames.h"
 #include "sprites/butterfly.h"
 #include <math.h>
@@ -357,13 +358,30 @@ void renderFrame(AppState state) {
     // Zzz in front of cat
     updateAndDrawZs();
 
-    // Alert text overlay
+    // Right side: alert text OR clock
     if (state == STATE_ALERT) {
         EventData ev = stateGetEvent();
         if (ev.valid && ev.title.length() > 0) {
             fb.setTextDatum(TC_DATUM);
             fb.setTextColor(COL_ALERT_FG, COL_BG);
-            fb.drawString(ev.title, TEXT_AREA_CX, 30, 4);
+            fb.drawString(ev.title, TEXT_AREA_CX, 50, 4);
+            int mins = stateMinutesUntilEvent();
+            if (mins >= 0) {
+                fb.setTextColor(COL_TEXT, COL_BG);
+                fb.drawString("em " + String(mins) + " min", TEXT_AREA_CX, 80, 2);
+            }
+        }
+    } else {
+        fb.setTextDatum(TC_DATUM);
+        if (timeSyncIsReady()) {
+            fb.setTextColor(COL_TEXT, COL_BG);
+            fb.drawString(timeSyncGetHHMM(), TEXT_AREA_CX, 45, 7);
+            fb.setTextColor(COL_TEXT_DIM, COL_BG);
+            fb.drawString(timeSyncGetDateStr(), TEXT_AREA_CX, 100, 4);
+        } else {
+            fb.setTextColor(COL_TEXT_DIM, COL_BG);
+            fb.drawString("--:--", TEXT_AREA_CX, 50, 7);
+            fb.drawString("Sincronizando...", TEXT_AREA_CX, 100, 2);
         }
     }
 
