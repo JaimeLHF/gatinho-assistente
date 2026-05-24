@@ -1,13 +1,15 @@
 #include "network.h"
 #include "config.h"
+#include "wifi_config.h"
 
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
 void networkSetup() {
+    wifiConfigBegin();
     WiFi.mode(WIFI_STA);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.begin(wifiConfigGetSSID().c_str(), wifiConfigGetPassword().c_str());
     Serial.print("[wifi] connecting");
 }
 
