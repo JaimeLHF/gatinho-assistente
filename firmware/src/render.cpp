@@ -44,6 +44,12 @@ static const int BTN_KEY  = 14;  // GPIO 14 (KEY)
 static unsigned long lastInteraction = 0;
 static const unsigned long SLEEP_TIMEOUT_MS = 30000;  // 30s
 
+// Clock digit slide animation
+static char prevClock[6] = {'-','-',':','-','-','\0'};
+static unsigned long clockAnimMs[5] = {0,0,0,0,0};
+static const unsigned long CLOCK_ANIM_MS = 250;
+static const int CLOCK_SLIDE_PX = 14;
+
 // Blink
 static unsigned long nextBlinkMs = 0;
 static unsigned long blinkEndMs  = 0;
@@ -480,14 +486,45 @@ void renderFrame(AppState state) {
             }
         }
     } else {
-        fb.setTextDatum(TC_DATUM);
         if (timeSyncIsReady()) {
-            fb.setTextColor(COL_TEXT, COL_BG);
-            fb.drawString(timeSyncGetHHMM(), TEXT_AREA_CX, 45, 7);
-            fb.setTextColor(COL_TEXT_DIM, COL_BG);
+            String timeStr = timeSyncGetHHMM();
+
+            // Detect digit changes and trigger animation
+            for (int i = 0; i < 5; i++) {
+                if (timeStr[i] != prevClock[i]) {
+                    clockAnimMs[i] = now;
+                    prevClock[i] = timeStr[i];
+                }
+            }
+
+            // Draw each character with individual slide animation
+            int totalW = fb.textWidth(timeStr, 7);
+            int penX = TEXT_AREA_CX - totalW / 2;
+            fb.setTextDatum(TL_DATUM);
+
+            for (int i = 0; i < 5; i++) {
+                char ch[2] = {timeStr[i], '\0'};
+                int chW = fb.textWidth(ch, 7);
+
+                int yOff = 0;
+                if (clockAnimMs[i] > 0 && now - clockAnimMs[i] < CLOCK_ANIM_MS) {
+                    float t = (float)(now - clockAnimMs[i]) / CLOCK_ANIM_MS;
+                    t = 1.0f - (1.0f - t) * (1.0f - t);  // ease-out
+                    yOff = (int)((1.0f - t) * CLOCK_SLIDE_PX);
+                }
+
+                fb.setTextColor(COL_TEXT);
+                fb.drawString(ch, penX, 45 + yOff, 7);
+                penX += chW;
+            }
+
+            // Date (static, no animation)
+            fb.setTextDatum(TC_DATUM);
+            fb.setTextColor(COL_TEXT_DIM);
             fb.drawString(timeSyncGetDateStr(), TEXT_AREA_CX, 100, 4);
         } else {
-            fb.setTextColor(COL_TEXT_DIM, COL_BG);
+            fb.setTextDatum(TC_DATUM);
+            fb.setTextColor(COL_TEXT_DIM);
             fb.drawString("--:--", TEXT_AREA_CX, 50, 7);
             fb.drawString("Sincronizando...", TEXT_AREA_CX, 100, 2);
         }
