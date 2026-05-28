@@ -113,6 +113,7 @@ export default function EventForm({
             id="durationMin"
             type="number"
             min="1"
+            max="10080"
             value={durationMin}
             onChange={(e) => setDurationMin(e.target.value)}
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
@@ -126,6 +127,7 @@ export default function EventForm({
             id="alertMinutesBefore"
             type="number"
             min="0"
+            max="1440"
             value={alertMinutesBefore}
             onChange={(e) => setAlertMinutesBefore(e.target.value)}
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
