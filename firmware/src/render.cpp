@@ -52,7 +52,6 @@ static const int BTN_KEY  = 14;  // GPIO 14 (KEY)
 
 // ---- Animation state ----
 static unsigned long lastInteraction = 0;
-static const unsigned long SLEEP_TIMEOUT_MS = 30000;  // 30s
 
 // Clock digit slide animation
 static char prevClock[6] = {'-','-',':','-','-','\0'};
@@ -60,7 +59,7 @@ static unsigned long clockAnimMs[5] = {0,0,0,0,0};
 static const unsigned long CLOCK_ANIM_MS = 250;
 static const int CLOCK_SLIDE_PX = 14;
 
-// Blink
+// Blink (independent, overlays between actions)
 static unsigned long nextBlinkMs = 0;
 static unsigned long blinkEndMs  = 0;
 static const unsigned long BLINK_DURATION_MS  = 500;
@@ -71,6 +70,49 @@ static const unsigned long BLINK_INTERVAL_MAX = 7000;
 static bool wasSleeping    = false;
 static unsigned long yawnEndMs = 0;
 static const unsigned long YAWN_DURATION_MS = 1500;
+
+// ---- Random action system ----
+enum CatAction {
+    ACT_IDLE,   // just standing
+    ACT_WAVE,   // waving (WAVEA/WAVEB alternating)
+    ACT_LOVE,   // happy face
+    ACT_NAP     // short nap (sleep + zzz, then yawn on wake)
+};
+
+static CatAction currentAction = ACT_IDLE;
+static unsigned long actionStartMs = 0;
+static unsigned long actionDurationMs = 0;
+static unsigned long nextActionMs = 0;
+
+// Action durations (ms)
+static const unsigned long WAVE_DURATION   = 2000;
+static const unsigned long LOVE_DURATION   = 2500;
+static const unsigned long NAP_DURATION_MIN = 8000;
+static const unsigned long NAP_DURATION_MAX = 15000;
+
+// Interval between actions (ms)
+static const unsigned long ACTION_INTERVAL_MIN = 8000;
+static const unsigned long ACTION_INTERVAL_MAX = 25000;
+
+static void pickRandomAction(unsigned long now) {
+    int r = random(100);
+    if (r < 35) {
+        currentAction = ACT_WAVE;
+        actionDurationMs = WAVE_DURATION;
+    } else if (r < 60) {
+        currentAction = ACT_LOVE;
+        actionDurationMs = LOVE_DURATION;
+    } else if (r < 80) {
+        currentAction = ACT_NAP;
+        actionDurationMs = random(NAP_DURATION_MIN, NAP_DURATION_MAX);
+    } else {
+        // Stay idle for this round
+        currentAction = ACT_IDLE;
+        actionDurationMs = 0;
+    }
+    actionStartMs = now;
+    nextActionMs = now + actionDurationMs + random(ACTION_INTERVAL_MIN, ACTION_INTERVAL_MAX);
+}
 
 // ---- Butterflies ----
 static const int MAX_BUTTERFLIES = 2;
@@ -481,17 +523,44 @@ static void drawWifiRetry(int secsLeft) {
 // ---- Public API ----
 
 // ---- Button reading ----
-static bool btnPressed = false;
+static bool btnBootPrev = false;
+static bool btnKeyPrev  = false;
+
+static void forceAction(CatAction action, unsigned long duration) {
+    currentAction = action;
+    actionStartMs = millis();
+    actionDurationMs = duration;
+    nextActionMs = millis() + duration + random(ACTION_INTERVAL_MIN, ACTION_INTERVAL_MAX);
+    // If waking from nap, cancel yawn
+    wasSleeping = false;
+}
 
 static void updateButtons(AppState appState) {
-    bool down = (digitalRead(BTN_BOOT) == LOW || digitalRead(BTN_KEY) == LOW);
-    if (down && !btnPressed) {
+    bool bootDown = (digitalRead(BTN_BOOT) == LOW);
+    bool keyDown  = (digitalRead(BTN_KEY) == LOW);
+
+    // BOOT button: pet → LOVE
+    if (bootDown && !btnBootPrev) {
         lastInteraction = millis();
         if (appState == STATE_ALERT) {
             stateDismissAlert();
+        } else {
+            forceAction(ACT_LOVE, 3000);
         }
     }
-    btnPressed = down;
+
+    // KEY button: play → WAVE
+    if (keyDown && !btnKeyPrev) {
+        lastInteraction = millis();
+        if (appState == STATE_ALERT) {
+            stateDismissAlert();
+        } else {
+            forceAction(ACT_WAVE, 3000);
+        }
+    }
+
+    btnBootPrev = bootDown;
+    btnKeyPrev  = keyDown;
 }
 
 // ---- Determine which cat frame to show ----
@@ -499,25 +568,44 @@ static int chooseCatFrame(unsigned long now, AppState appState) {
     // ALERT from API has highest priority
     if (appState == STATE_ALERT) return CAT_FRAME_ALERT;
 
-    bool sleeping = (now - lastInteraction) >= SLEEP_TIMEOUT_MS;
-
-    // Detect rising edge: was sleeping, now awake → yawn
-    if (wasSleeping && !sleeping) {
-        yawnEndMs = now + YAWN_DURATION_MS;
+    // Trigger new random action?
+    if (now >= nextActionMs) {
+        // If finishing a nap, yawn first
+        if (currentAction == ACT_NAP) {
+            wasSleeping = true;
+            yawnEndMs = now + YAWN_DURATION_MS;
+        }
+        pickRandomAction(now);
     }
-    wasSleeping = sleeping;
 
-    // Yawning (just woke up)
-    if (!sleeping && now < yawnEndMs) return CAT_FRAME_YAWN;
+    // Yawning (waking up from nap)
+    if (wasSleeping && currentAction != ACT_NAP) {
+        if (now < yawnEndMs) return CAT_FRAME_YAWN;
+        wasSleeping = false;
+    }
 
-    // Sleeping
-    if (sleeping) return CAT_FRAME_SLEEP;
+    // Current action
+    bool inAction = (now - actionStartMs) < actionDurationMs;
+    if (inAction) {
+        switch (currentAction) {
+            case ACT_WAVE: {
+                int waveFrame = ((now / 200) % 2 == 0) ? CAT_FRAME_WAVEA : CAT_FRAME_WAVEB;
+                return waveFrame;
+            }
+            case ACT_LOVE:
+                return CAT_FRAME_LOVE;
+            case ACT_NAP:
+                return CAT_FRAME_SLEEP;
+            default:
+                break;
+        }
+    }
 
-    // Blink timer
+    // Blink timer (independent, fires during idle)
     if (now < blinkEndMs) return CAT_FRAME_BLINK;
     if (now >= nextBlinkMs) {
         blinkEndMs = now + BLINK_DURATION_MS;
-        nextBlinkMs = now + BLINK_INTERVAL_MIN + (random(BLINK_INTERVAL_MAX - BLINK_INTERVAL_MIN));
+        nextBlinkMs = now + BLINK_INTERVAL_MIN + random(BLINK_INTERVAL_MAX - BLINK_INTERVAL_MIN);
     }
 
     return CAT_FRAME_IDLE;
@@ -546,6 +634,7 @@ void renderSetup() {
     // Init animation timers
     lastInteraction = millis();
     nextBlinkMs = millis() + 3000 + random(4000);
+    nextActionMs = millis() + random(5000, 12000);
     nextBtfAt = millis() + random(2000, 6000);
     for (int i = 0; i < MAX_BUTTERFLIES; i++) btfs[i].active = false;
     for (int i = 0; i < MAX_ZS; i++) zzs[i].active = false;
