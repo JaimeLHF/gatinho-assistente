@@ -1,6 +1,7 @@
 #include "render.h"
 #include "state.h"
 #include "time_sync.h"
+#include "weather.h"
 #include "wifi_portal.h"
 #include "button_reset.h"
 #include "sprites/frames.h"
@@ -522,6 +523,19 @@ void renderFrame(AppState state) {
             fb.setTextDatum(TC_DATUM);
             fb.setTextColor(COL_TEXT_DIM);
             fb.drawString(timeSyncGetDateStr(), TEXT_AREA_CX, 100, 4);
+
+            // Temperature
+            if (weatherIsReady()) {
+                String tempStr = weatherGetTempStr();
+                fb.setTextDatum(TC_DATUM);
+                fb.setTextColor(COL_TEXT_DIM);
+                int tw = fb.textWidth(tempStr, 4);
+                // Draw number + "C"
+                fb.drawString(tempStr, TEXT_AREA_CX, 132, 4);
+                // Draw degree symbol (small circle before "C")
+                int circX = TEXT_AREA_CX + tw / 2 - fb.textWidth("C", 4) - 2;
+                fb.drawCircle(circX, 135, 3, COL_TEXT_DIM);
+            }
         } else {
             fb.setTextDatum(TC_DATUM);
             fb.setTextColor(COL_TEXT_DIM);

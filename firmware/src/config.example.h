@@ -14,3 +14,7 @@
 
 // Polling interval in milliseconds
 #define POLL_INTERVAL_MS 60000
+
+// Coordinates for weather (Open-Meteo API)
+#define WEATHER_LAT  -23.5505  // São Paulo
+#define WEATHER_LON  -46.6340

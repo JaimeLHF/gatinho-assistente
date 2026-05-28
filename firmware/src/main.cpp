@@ -8,6 +8,7 @@
 #include "wifi_config.h"
 #include "wifi_portal.h"
 #include "button_reset.h"
+#include "weather.h"
 
 static bool ntpStarted = false;
 
@@ -57,6 +58,8 @@ void loop() {
             timeSyncInit();
             ntpStarted = true;
         }
+
+        weatherUpdate();
     }
 
     unsigned long now = millis();
