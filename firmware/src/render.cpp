@@ -6,6 +6,8 @@
 #include "button_reset.h"
 #include "sprites/frames.h"
 #include "sprites/butterfly.h"
+#include "sprites/error.h"
+#include <WiFi.h>
 #include <math.h>
 
 static TFT_eSPI tft;
@@ -15,7 +17,6 @@ static TFT_eSprite fb(&tft);
 static const int W = 320;
 static const int H = 170;
 static const int CX = W / 2;
-static const int SCALE = 1;
 
 // ---- Colors (RGB565 native — sem swap, sem inversao) ----
 static const uint16_t COL_BG        = 0x3186;  // cinza chumbo escuro
@@ -27,14 +28,22 @@ static const uint16_t COL_TEXT_DIM  = 0x7BCF;  // medium gray
 static const uint16_t COL_ALERT_FG  = 0xFCC8;  // laranja suave
 static const uint16_t COL_HEART     = 0xFB14;  // heart pink
 static const uint16_t COL_HEART_HI  = 0xFD9F;  // heart highlight
+static const uint16_t COL_SUN       = 0xFEE0;  // bright yellow
+static const uint16_t COL_CLOUD     = 0xC618;  // light gray
+static const uint16_t COL_RAIN      = 0x5D1F;  // blue
+static const uint16_t COL_SNOW_DOT  = 0xFFFF;  // white
 
-// Cat position: left side, vertically centered +4px
-static const int CAT_OX = 30;
-static const int CAT_OY = (H - CAT_FRAME_H * SCALE) / 2 + 4;
+// Cat scaled up ~112%
+static const int CAT_DRAW_W = 110;  // 98 * 1.12
+static const int CAT_DRAW_H = 120;  // 107 * 1.12
 
-// Text area: right side of the cat
-static const int TEXT_AREA_X  = 120;
-static const int TEXT_AREA_W  = W - 120 - 8;
+// Cat position: left side, vertically centered
+static const int CAT_OX = 16;
+static const int CAT_OY = (H - CAT_DRAW_H) / 2 + 4;
+
+// Text area: centered in the space right of the cat
+static const int TEXT_AREA_X  = CAT_OX + CAT_DRAW_W + 4;
+static const int TEXT_AREA_W  = W - TEXT_AREA_X - 4;
 static const int TEXT_AREA_CX = TEXT_AREA_X + TEXT_AREA_W / 2;
 
 // ---- Buttons ----
@@ -105,19 +114,33 @@ struct Zzz {
 static Zzz zzs[MAX_ZS];
 static unsigned long lastZSpawn = 0;
 
+// Error sprite scaled to same size as cat
+static const int ERR_DRAW_W = CAT_DRAW_W;
+static const int ERR_DRAW_H = CAT_DRAW_H;
+
 // ---- Drawing helpers (pixel-a-pixel, sem pushImage, sem setSwapBytes) ----
 
+static void drawErrorFrame(int ox, int oy) {
+    for (int dy = 0; dy < ERR_DRAW_H; dy++) {
+        int sy = dy * ERROR_FRAME_H / ERR_DRAW_H;
+        for (int dx = 0; dx < ERR_DRAW_W; dx++) {
+            int sx = dx * ERROR_FRAME_W / ERR_DRAW_W;
+            uint16_t p = pgm_read_word(&error_frames[0][sy * ERROR_FRAME_W + sx]);
+            if (p == ERROR_TRANSPARENT) continue;
+            fb.drawPixel(ox + dx, oy + dy, p);
+        }
+    }
+}
+
 static void drawCatFrame(int ox, int oy, int frameIdx, bool flip = false) {
-    for (int y = 0; y < CAT_FRAME_H; y++) {
-        for (int x = 0; x < CAT_FRAME_W; x++) {
-            uint16_t p = pgm_read_word(&cat_frames[frameIdx][y * CAT_FRAME_W + x]);
+    for (int dy = 0; dy < CAT_DRAW_H; dy++) {
+        int sy = dy * CAT_FRAME_H / CAT_DRAW_H;
+        for (int dx = 0; dx < CAT_DRAW_W; dx++) {
+            int sx = dx * CAT_FRAME_W / CAT_DRAW_W;
+            uint16_t p = pgm_read_word(&cat_frames[frameIdx][sy * CAT_FRAME_W + sx]);
             if (p == CAT_TRANSPARENT) continue;
-            int dx = flip ? (CAT_FRAME_W - 1 - x) : x;
-            if (SCALE == 1) {
-                fb.drawPixel(ox + dx, oy + y, p);
-            } else {
-                fb.fillRect(ox + dx * SCALE, oy + y * SCALE, SCALE, SCALE, p);
-            }
+            int px = flip ? (CAT_DRAW_W - 1 - dx) : dx;
+            fb.drawPixel(ox + px, oy + dy, p);
         }
     }
 }
@@ -214,11 +237,71 @@ static void updateAndDrawZs() {
     }
 }
 
+// ---- Weather icons (procedural, ~28x24 bounding box) ----
+static const int ICON_W = 28;
+static const int ICON_H = 24;
+
+static void drawCloudShape(int x, int y, uint16_t col) {
+    fb.fillCircle(x + 5, y + 9, 5, col);
+    fb.fillCircle(x + 13, y + 5, 7, col);
+    fb.fillCircle(x + 21, y + 9, 5, col);
+    fb.fillRect(x + 1, y + 9, 24, 7, col);
+}
+
+static void drawWeatherIcon(int x, int y, WeatherIcon icon) {
+    switch (icon) {
+        case ICON_CLEAR: {
+            int cx = x + ICON_W / 2;
+            int cy = y + ICON_H / 2;
+            fb.fillCircle(cx, cy, 7, COL_SUN);
+            for (int a = 0; a < 360; a += 45) {
+                float rad = a * PI / 180.0f;
+                int x1 = cx + (int)(9 * cosf(rad));
+                int y1 = cy + (int)(9 * sinf(rad));
+                int x2 = cx + (int)(11 * cosf(rad));
+                int y2 = cy + (int)(11 * sinf(rad));
+                fb.drawLine(x1, y1, x2, y2, COL_SUN);
+            }
+            break;
+        }
+        case ICON_PARTLY_CLOUDY: {
+            // Sun peeking upper-left
+            fb.fillCircle(x + 9, y + 6, 5, COL_SUN);
+            for (int a = 180; a < 360; a += 45) {
+                float rad = a * PI / 180.0f;
+                int x1 = x + 9 + (int)(7 * cosf(rad));
+                int y1 = y + 6 + (int)(7 * sinf(rad));
+                int x2 = x + 9 + (int)(9 * cosf(rad));
+                int y2 = y + 6 + (int)(9 * sinf(rad));
+                fb.drawLine(x1, y1, x2, y2, COL_SUN);
+            }
+            // Cloud overlapping lower-right
+            drawCloudShape(x + 1, y + 6, COL_CLOUD);
+            break;
+        }
+        case ICON_CLOUDY:
+            drawCloudShape(x + 1, y + 4, COL_CLOUD);
+            break;
+        case ICON_RAIN:
+            drawCloudShape(x + 1, y + 1, COL_CLOUD);
+            fb.drawLine(x + 6,  y + 17, x + 4,  y + 21, COL_RAIN);
+            fb.drawLine(x + 13, y + 17, x + 11, y + 21, COL_RAIN);
+            fb.drawLine(x + 20, y + 17, x + 18, y + 21, COL_RAIN);
+            break;
+        case ICON_SNOW:
+            drawCloudShape(x + 1, y + 1, COL_CLOUD);
+            fb.fillCircle(x + 6,  y + 20, 2, COL_SNOW_DOT);
+            fb.fillCircle(x + 13, y + 20, 2, COL_SNOW_DOT);
+            fb.fillCircle(x + 20, y + 20, 2, COL_SNOW_DOT);
+            break;
+    }
+}
+
 static void drawScene() {
     // Shadow ellipse under cat (acompanha breathing)
-    int sx = CAT_OX + (CAT_FRAME_W * SCALE) / 2;
-    int sy = CAT_OY + 96;  // fixa no chão, gato respira por cima
-    fb.fillEllipse(sx, sy, 24, 3, COL_SHADOW);
+    int sx = CAT_OX + CAT_DRAW_W / 2;
+    int sy = CAT_OY + CAT_DRAW_H - 10;
+    fb.fillEllipse(sx, sy, 28, 3, COL_SHADOW);
 }
 
 // ---- State screens ----
@@ -252,15 +335,73 @@ static void drawResetHint() {
 static void drawError() {
     fb.fillSprite(COL_BG);
     drawScene();
-    drawCatFrame(CAT_OX, CAT_OY, CAT_FRAME_ALERT);
+    drawErrorFrame(CAT_OX, CAT_OY);
 
     fb.setTextDatum(TC_DATUM);
-    fb.setTextColor(COL_ALERT_FG, COL_BG);
-    fb.drawString("Erro de conexao", TEXT_AREA_CX, 50, 2);
-    fb.setTextColor(COL_TEXT_DIM, COL_BG);
-    fb.drawString("Tentando novamente...", TEXT_AREA_CX, 70, 2);
 
+    fb.setFreeFont(&FreeSansBold12pt7b);
+    fb.setTextColor(COL_ALERT_FG, COL_BG);
+    fb.drawString("WiFi desconectado", TEXT_AREA_CX, 55);
+
+    fb.setFreeFont(&FreeSansBold9pt7b);
+    fb.setTextColor(COL_TEXT_DIM, COL_BG);
+    fb.drawString("Reconectando...", TEXT_AREA_CX, 85);
+
+    fb.setTextFont(1);  // reset
     drawResetHint();
+}
+
+static const unsigned long API_WAVE_MS = 200;  // alternate every 200ms
+
+static const uint16_t COL_GREEN = 0x07E0;  // green for WiFi OK
+
+static void drawApiError() {
+    fb.fillSprite(COL_BG);
+    drawScene();
+    drawErrorFrame(CAT_OX, CAT_OY);
+
+    fb.setTextDatum(TC_DATUM);
+
+    // Title
+    fb.setFreeFont(&FreeSansBold12pt7b);
+    fb.setTextColor(COL_ALERT_FG, COL_BG);
+    fb.drawString("Erro na API", TEXT_AREA_CX, 30);
+
+    // WiFi status with green check
+    fb.setFreeFont(&FreeSansBold9pt7b);
+    fb.setTextColor(COL_GREEN, COL_BG);
+    fb.drawString("WiFi Conectado", TEXT_AREA_CX, 65);
+    // Green dot as status indicator
+    fb.fillCircle(TEXT_AREA_CX - fb.textWidth("WiFi Conectado") / 2 - 8, 70, 4, COL_GREEN);
+
+    // Subtitle (thin modern font)
+    fb.setFreeFont(&FreeSans9pt7b);
+    fb.setTextColor(COL_TEXT_DIM, COL_BG);
+    fb.drawString("Servidor inacessivel", TEXT_AREA_CX, 100);
+
+    // "Tentando novamente" + spinner to the right
+    String retryStr = "Tentando novamente";
+    int retryW = fb.textWidth(retryStr);
+    int totalW = retryW + 16;  // text + gap + spinner
+    int retryX = TEXT_AREA_CX - totalW / 2;
+    fb.setTextDatum(TL_DATUM);
+    fb.drawString(retryStr, retryX, 120);
+
+    // Spinner to the right of text
+    int spinCX = retryX + retryW + 10;
+    int spinCY = 126;
+    int spinR = 5;
+    float angle = (millis() % 1000) * 2.0f * PI / 1000.0f;
+    for (int i = 0; i < 6; i++) {
+        float a = angle + i * 0.3f;
+        int px = spinCX + (int)(spinR * cosf(a));
+        int py = spinCY + (int)(spinR * sinf(a));
+        uint8_t brightness = 255 - i * 40;
+        uint16_t col = ((brightness >> 3) << 11) | ((brightness >> 2) << 5) | (brightness >> 3);
+        fb.fillCircle(px, py, 1, col);
+    }
+
+    fb.setTextFont(1);  // reset
 }
 
 static const uint16_t COL_RESET_BG = 0xC000;  // vermelho escuro
@@ -435,6 +576,13 @@ void renderFrame(AppState state) {
         return;
     }
 
+    if (state == STATE_API_ERROR) {
+        drawApiError();
+        drawResetOverlay();
+        fb.pushSprite(0, 0);
+        return;
+    }
+
     // IDLE or ALERT
     unsigned long now = millis();
     int frame = chooseCatFrame(now, state);
@@ -448,8 +596,8 @@ void renderFrame(AppState state) {
 
     // Spawn Zzz when sleeping
     if (sleeping && (now - lastZSpawn >= Z_SPAWN_MS)) {
-        int headX = CAT_OX + CAT_FRAME_W / 2 - (9 * Z_SCALE) / 2;
-        int headY = CAT_OY + CAT_FRAME_H / 4;
+        int headX = CAT_OX + CAT_DRAW_W / 2 - (9 * Z_SCALE) / 2;
+        int headY = CAT_OY + CAT_DRAW_H / 4;
         spawnZ(headX, headY);
         lastZSpawn = now;
     }
@@ -500,7 +648,7 @@ void renderFrame(AppState state) {
 
             // Draw each character with individual slide animation
             int totalW = fb.textWidth(timeStr, 7);
-            int penX = TEXT_AREA_CX - totalW / 2;
+            int penX = TEXT_AREA_CX - totalW / 2 - 6;  // nudge left for visual balance
             fb.setTextDatum(TL_DATUM);
 
             for (int i = 0; i < 5; i++) {
@@ -515,32 +663,46 @@ void renderFrame(AppState state) {
                 }
 
                 fb.setTextColor(COL_TEXT);
-                fb.drawString(ch, penX, 45 + yOff, 7);
+                fb.drawString(ch, penX, 30 + yOff, 7);
                 penX += chW;
             }
 
             // Date (static, no animation)
             fb.setTextDatum(TC_DATUM);
             fb.setTextColor(COL_TEXT_DIM);
-            fb.drawString(timeSyncGetDateStr(), TEXT_AREA_CX, 100, 4);
+            fb.drawString(timeSyncGetDateStr(), TEXT_AREA_CX, 85, 4);
 
-            // Temperature
+            // Temperature + weather icon: "22°C ☀"
             if (weatherIsReady()) {
-                String tempStr = weatherGetTempStr();
-                fb.setTextDatum(TC_DATUM);
-                fb.setTextColor(COL_TEXT_DIM);
-                int tw = fb.textWidth(tempStr, 4);
-                // Draw number + "C"
-                fb.drawString(tempStr, TEXT_AREA_CX, 132, 4);
-                // Draw degree symbol (small circle before "C")
-                int circX = TEXT_AREA_CX + tw / 2 - fb.textWidth("C", 4) - 2;
-                fb.drawCircle(circX, 135, 3, COL_TEXT_DIM);
+                String numStr = String(weatherGetTemp());
+                fb.setFreeFont(&FreeSansBold12pt7b);
+                int numW = fb.textWidth(numStr);
+                int degCW = fb.textWidth("C");
+                int totalW = numW + 8 + degCW + 6 + ICON_W;  // num + °C + gap + icon
+                int startX = TEXT_AREA_CX - totalW / 2 + 6;  // nudge right for visual balance
+                int tempY = 117;
+
+                // Temperature number
+                fb.setTextDatum(TL_DATUM);
+                fb.setTextColor(COL_TEXT);
+                fb.drawString(numStr, startX, tempY);
+
+                // Degree circle + "C"
+                int degX = startX + numW + 2;
+                fb.drawCircle(degX + 2, tempY + 1, 2, COL_TEXT);
+                fb.drawString("C", degX + 6, tempY);
+
+                fb.setTextFont(1);  // reset to built-in font
+
+                // Weather icon (after text)
+                int iconX = startX + numW + 8 + degCW + 6;
+                drawWeatherIcon(iconX, tempY - 2, weatherGetIcon());
             }
         } else {
             fb.setTextDatum(TC_DATUM);
             fb.setTextColor(COL_TEXT_DIM);
-            fb.drawString("--:--", TEXT_AREA_CX, 50, 7);
-            fb.drawString("Sincronizando...", TEXT_AREA_CX, 100, 2);
+            fb.drawString("--:--", TEXT_AREA_CX, 30, 7);
+            fb.drawString("Sincronizando...", TEXT_AREA_CX, 85, 2);
         }
     }
 

@@ -1,4 +1,6 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { type Options } from "express-rate-limit";
+
+const ipKeyGenerator: Options["keyGenerator"] = (req, _res) => req.ip ?? "unknown";
 
 /** Strict limiter for auth endpoints (login, register, refresh). */
 export const authLimiter = rateLimit({
@@ -34,7 +36,8 @@ export const devicePollLimiter = rateLimit({
   limit: 30,
   standardHeaders: "draft-7",
   legacyHeaders: false,
-  keyGenerator: (req) => (req.headers["x-device-token"] as string) ?? req.ip ?? "unknown",
+  keyGenerator: (req, res) =>
+    (req.headers["x-device-token"] as string) ?? ipKeyGenerator(req, res),
   message: {
     error: {
       code: "TOO_MANY_REQUESTS",

@@ -1,5 +1,6 @@
 #include "state.h"
 #include "network.h"
+#include "weather.h"
 #include "config.h"
 
 #include <ArduinoJson.h>
@@ -47,28 +48,35 @@ void stateUpdate() {
     // Handle WiFi connection state
     if (!networkIsConnected()) {
         if (currentState != STATE_CONNECTING) {
-            currentState = STATE_CONNECTING;
+            currentState = STATE_ERROR;
+            Serial.println("[state] WiFi lost, switching to ERROR");
         }
         return;
     }
 
-    if (currentState == STATE_CONNECTING) {
+    if (currentState == STATE_CONNECTING || currentState == STATE_ERROR) {
         currentState = STATE_IDLE;
-        Serial.println("[state] connected, switching to IDLE");
+        Serial.println("[state] WiFi connected, switching to IDLE");
     }
 
-    // Poll periodically
+    // Poll periodically (retry faster when API is down)
     unsigned long now = millis();
-    if (firstPoll || (now - lastPollMs >= POLL_INTERVAL_MS)) {
+    unsigned long pollInterval = (currentState == STATE_API_ERROR) ? 15000 : POLL_INTERVAL_MS;
+    if (firstPoll || (now - lastPollMs >= pollInterval)) {
         firstPoll = false;
         lastPollMs = now;
 
         String eventJson, serverTime;
         if (networkPoll(eventJson, serverTime)) {
+            if (currentState == STATE_API_ERROR) {
+                Serial.println("[state] API recovered");
+                currentState = STATE_IDLE;
+                weatherForceRefresh();
+            }
             stateSyncTime(serverTime);
             stateSetEvent(eventJson);
         } else {
-            currentState = STATE_ERROR;
+            currentState = STATE_API_ERROR;
             return;
         }
     }

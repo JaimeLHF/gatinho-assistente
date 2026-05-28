@@ -6,7 +6,8 @@ enum AppState {
     STATE_CONNECTING,
     STATE_IDLE,
     STATE_ALERT,
-    STATE_ERROR,
+    STATE_ERROR,      // WiFi disconnected
+    STATE_API_ERROR,  // WiFi OK but API unreachable
     STATE_PORTAL
 };
 
