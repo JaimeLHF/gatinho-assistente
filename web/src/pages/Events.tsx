@@ -185,9 +185,7 @@ export default function Events() {
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="truncate font-medium text-gray-900">
-                    {event.title}
-                  </h3>
+                  <h3 className="truncate font-medium text-gray-900">{event.title}</h3>
                   <span
                     className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[event.status]}`}
                   >
@@ -200,18 +198,14 @@ export default function Events() {
                   {` · alerta ${event.alertMinutesBefore} min antes`}
                 </p>
                 {event.description && (
-                  <p className="mt-1 truncate text-sm text-gray-400">
-                    {event.description}
-                  </p>
+                  <p className="mt-1 truncate text-sm text-gray-400">{event.description}</p>
                 )}
               </div>
 
               <div className="ml-4 flex shrink-0 items-center gap-1">
                 {event.status === "PENDING" && (
                   <button
-                    onClick={() =>
-                      statusMutation.mutate({ id: event.id, status: "DONE" })
-                    }
+                    onClick={() => statusMutation.mutate({ id: event.id, status: "DONE" })}
                     className="rounded px-2 py-1 text-xs text-green-700 hover:bg-green-50"
                   >
                     Concluir

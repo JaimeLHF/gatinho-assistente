@@ -79,11 +79,15 @@ export default function Profile() {
       <form onSubmit={handleProfile} className="rounded-lg bg-white p-6 shadow-sm space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Dados pessoais</h2>
 
-        {profileMsg && <p className="rounded bg-green-50 p-2 text-sm text-green-700">{profileMsg}</p>}
+        {profileMsg && (
+          <p className="rounded bg-green-50 p-2 text-sm text-green-700">{profileMsg}</p>
+        )}
         {profileErr && <p className="rounded bg-red-50 p-2 text-sm text-red-600">{profileErr}</p>}
 
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nome</label>
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+            Nome
+          </label>
           <input
             id="name"
             required
@@ -94,7 +98,9 @@ export default function Profile() {
         </div>
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            Email
+          </label>
           <input
             id="email"
             type="email"
@@ -122,7 +128,9 @@ export default function Profile() {
         {pwdErr && <p className="rounded bg-red-50 p-2 text-sm text-red-600">{pwdErr}</p>}
 
         <div>
-          <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700">Senha atual</label>
+          <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700">
+            Senha atual
+          </label>
           <input
             id="currentPassword"
             type="password"
@@ -134,7 +142,9 @@ export default function Profile() {
         </div>
 
         <div>
-          <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">Nova senha</label>
+          <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">
+            Nova senha
+          </label>
           <input
             id="newPassword"
             type="password"
@@ -147,7 +157,9 @@ export default function Profile() {
         </div>
 
         <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">Confirmar nova senha</label>
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+            Confirmar nova senha
+          </label>
           <input
             id="confirmPassword"
             type="password"

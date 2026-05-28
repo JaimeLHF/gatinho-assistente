@@ -23,20 +23,11 @@ function toLocalDatetime(iso: string): string {
   return local.toISOString().slice(0, 16);
 }
 
-export default function EventForm({
-  initial,
-  onSubmit,
-  onCancel,
-  submitLabel,
-}: EventFormProps) {
+export default function EventForm({ initial, onSubmit, onCancel, submitLabel }: EventFormProps) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [startsAt, setStartsAt] = useState(
-    initial ? toLocalDatetime(initial.startsAt) : "",
-  );
-  const [durationMin, setDurationMin] = useState(
-    initial?.durationMin?.toString() ?? "",
-  );
+  const [startsAt, setStartsAt] = useState(initial ? toLocalDatetime(initial.startsAt) : "");
+  const [durationMin, setDurationMin] = useState(initial?.durationMin?.toString() ?? "");
   const [alertMinutesBefore, setAlertMinutesBefore] = useState(
     initial?.alertMinutesBefore?.toString() ?? "5",
   );
@@ -58,9 +49,7 @@ export default function EventForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <p className="rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
 
       <div>
         <label htmlFor="title" className="block text-sm font-medium text-gray-700">

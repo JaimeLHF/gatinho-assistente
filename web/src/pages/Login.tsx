@@ -32,15 +32,11 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm rounded-lg bg-white p-8 shadow">
-        <h1 className="mb-6 text-center text-2xl font-bold text-gray-900">
-          Gatinho Pet
-        </h1>
+        <h1 className="mb-6 text-center text-2xl font-bold text-gray-900">Gatinho Pet</h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <p className="rounded bg-red-50 p-2 text-center text-sm text-red-600">
-              {error}
-            </p>
+            <p className="rounded bg-red-50 p-2 text-center text-sm text-red-600">{error}</p>
           )}
 
           <div>

@@ -53,10 +53,7 @@ export default function Layout() {
                 >
                   {user.name}
                 </NavLink>
-                <button
-                  onClick={handleLogout}
-                  className="text-sm text-gray-500 hover:text-red-600"
-                >
+                <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-red-600">
                   Sair
                 </button>
               </>

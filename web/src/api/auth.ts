@@ -22,8 +22,12 @@ export async function login(data: LoginData): Promise<AuthResponse> {
   return res.data;
 }
 
-export async function refresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
-  const res = await api.post<{ accessToken: string; refreshToken: string }>("/auth/refresh", { refreshToken });
+export async function refresh(
+  refreshToken: string,
+): Promise<{ accessToken: string; refreshToken: string }> {
+  const res = await api.post<{ accessToken: string; refreshToken: string }>("/auth/refresh", {
+    refreshToken,
+  });
   return res.data;
 }
 

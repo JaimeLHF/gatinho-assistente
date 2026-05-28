@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import * as authApi from "../api/auth";
 import type { User } from "../types";
 
@@ -31,21 +24,17 @@ function clearTokens() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !!localStorage.getItem("accessToken"));
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    if (!loading) return;
 
     authApi
       .getMe()
       .then(setUser)
       .catch(() => clearTokens())
       .finally(() => setLoading(false));
-  }, []);
+  }, [loading]);
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await authApi.login({ email, password });
@@ -53,14 +42,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user);
   }, []);
 
-  const register = useCallback(
-    async (email: string, password: string, name: string) => {
-      const res = await authApi.register({ email, password, name });
-      saveTokens(res.accessToken, res.refreshToken);
-      setUser(res.user);
-    },
-    [],
-  );
+  const register = useCallback(async (email: string, password: string, name: string) => {
+    const res = await authApi.register({ email, password, name });
+    saveTokens(res.accessToken, res.refreshToken);
+    setUser(res.user);
+  }, []);
 
   const logout = useCallback(async () => {
     const rt = localStorage.getItem("refreshToken");

@@ -34,7 +34,7 @@ export const devicePollLimiter = rateLimit({
   limit: 30,
   standardHeaders: "draft-7",
   legacyHeaders: false,
-  keyGenerator: (req) => req.headers["x-device-token"] as string ?? req.ip ?? "unknown",
+  keyGenerator: (req) => (req.headers["x-device-token"] as string) ?? req.ip ?? "unknown",
   message: {
     error: {
       code: "TOO_MANY_REQUESTS",

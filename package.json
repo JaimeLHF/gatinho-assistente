@@ -1,6 +1,7 @@
 {
   "name": "gatinho-pet",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "pnpm run --parallel dev:api dev:web",
     "dev:api": "pnpm --filter api dev",
@@ -10,6 +11,20 @@
     "build:web": "pnpm --filter web build",
     "type-check": "pnpm --filter api type-check && pnpm --filter web type-check",
     "test": "pnpm --filter api test",
-    "test:api": "pnpm --filter api test"
+    "test:api": "pnpm --filter api test",
+    "lint": "eslint api/src web/src",
+    "lint:fix": "eslint api/src web/src --fix",
+    "format": "prettier --write \"api/src/**/*.ts\" \"web/src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"api/src/**/*.ts\" \"web/src/**/*.{ts,tsx}\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
+    "typescript-eslint": "^8.60.0"
   }
 }

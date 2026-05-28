@@ -1,10 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { ApiError } from "../middlewares/errorHandler.js";
-import type {
-  CreateEventInput,
-  UpdateEventInput,
-  ListEventsQuery,
-} from "../schemas/event.js";
+import type { CreateEventInput, UpdateEventInput, ListEventsQuery } from "../schemas/event.js";
 
 export async function list(userId: string, query: ListEventsQuery) {
   const where: Record<string, unknown> = { userId };
@@ -38,11 +34,7 @@ export async function getById(userId: string, eventId: string) {
   return event;
 }
 
-export async function update(
-  userId: string,
-  eventId: string,
-  data: UpdateEventInput,
-) {
+export async function update(userId: string, eventId: string, data: UpdateEventInput) {
   await getById(userId, eventId);
 
   return prisma.event.update({

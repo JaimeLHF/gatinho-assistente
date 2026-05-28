@@ -16,11 +16,7 @@ router.use("/events", authenticate);
 router.get("/events", validate({ query: listEventsQuery }), eventController.list);
 router.post("/events", validate({ body: createEventSchema }), eventController.create);
 
-router.get(
-  "/events/:id",
-  validate({ params: eventParamsSchema }),
-  eventController.getById,
-);
+router.get("/events/:id", validate({ params: eventParamsSchema }), eventController.getById);
 
 router.patch(
   "/events/:id",
@@ -28,10 +24,6 @@ router.patch(
   eventController.update,
 );
 
-router.delete(
-  "/events/:id",
-  validate({ params: eventParamsSchema }),
-  eventController.remove,
-);
+router.delete("/events/:id", validate({ params: eventParamsSchema }), eventController.remove);
 
 export default router;

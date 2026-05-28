@@ -16,10 +16,6 @@ router.patch(
   deviceController.update,
 );
 
-router.delete(
-  "/devices/:id",
-  validate({ params: deviceParamsSchema }),
-  deviceController.remove,
-);
+router.delete("/devices/:id", validate({ params: deviceParamsSchema }), deviceController.remove);
 
 export default router;

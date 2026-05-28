@@ -1,0 +1,7 @@
+node_modules
+dist
+build
+.pio
+pnpm-lock.yaml
+firmware
+api/src/generated

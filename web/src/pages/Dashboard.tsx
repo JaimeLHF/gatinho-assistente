@@ -25,9 +25,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">
-        Ola, {user?.name}
-      </h1>
+      <h1 className="text-2xl font-bold text-gray-900">Ola, {user?.name}</h1>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <div className="rounded-lg bg-white p-4 shadow-sm">
@@ -64,9 +62,7 @@ export default function Dashboard() {
                 className="flex items-center justify-between rounded-lg bg-white p-3 shadow-sm"
               >
                 <span className="font-medium text-gray-900">{event.title}</span>
-                <span className="text-sm text-gray-500">
-                  {formatDate(event.startsAt)}
-                </span>
+                <span className="text-sm text-gray-500">{formatDate(event.startsAt)}</span>
               </li>
             ))}
           </ul>
