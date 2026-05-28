@@ -9,8 +9,10 @@
 #include "wifi_portal.h"
 #include "button_reset.h"
 #include "weather.h"
+#include "ota.h"
 
 static bool ntpStarted = false;
+static bool otaStarted = false;
 
 static unsigned long lastRenderMs = 0;
 static const unsigned long RENDER_INTERVAL_MS = 33; // ~30fps for smooth animations
@@ -53,13 +55,18 @@ void loop() {
     } else {
         stateUpdate();
 
-        // Init NTP once WiFi is connected
+        // Init NTP + OTA once WiFi is connected
         if (!ntpStarted && networkIsConnected()) {
             timeSyncInit();
             ntpStarted = true;
         }
+        if (!otaStarted && networkIsConnected()) {
+            otaSetup();
+            otaStarted = true;
+        }
 
         weatherUpdate();
+        otaLoop();
     }
 
     unsigned long now = millis();
