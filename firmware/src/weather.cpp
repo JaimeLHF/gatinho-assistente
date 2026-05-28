@@ -29,7 +29,7 @@ void weatherUpdate() {
     if (!networkIsConnected()) return;
 
     unsigned long now = millis();
-    unsigned long cooldown = tempValid ? WEATHER_INTERVAL_MS : 60000;
+    unsigned long cooldown = tempValid ? WEATHER_INTERVAL_MS : 15000;
     if (!firstFetch && (now - lastFetchMs < cooldown)) return;
 
     firstFetch = false;

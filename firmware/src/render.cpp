@@ -865,8 +865,22 @@ void renderFrame(AppState state) {
             fb.setTextColor(COL_TEXT_DIM);
             fb.drawString(timeSyncGetDateStr(), TEXT_AREA_CX, 85, 4);
 
-            // Temperature + weather icon: "22°C ☀"
-            if (weatherIsReady()) {
+            // Temperature + weather icon: "22°C ☀" or loading spinner
+            if (!weatherIsReady()) {
+                // Spinner while loading temperature
+                int spinCX = TEXT_AREA_CX;
+                int spinCY = 124;
+                int spinR = 6;
+                float angle = (millis() % 1000) * 2.0f * PI / 1000.0f;
+                for (int i = 0; i < 8; i++) {
+                    float a = angle + i * 0.35f;
+                    int px = spinCX + (int)(spinR * cosf(a));
+                    int py = spinCY + (int)(spinR * sinf(a));
+                    uint8_t brightness = 200 - i * 22;
+                    uint16_t col = ((brightness >> 3) << 11) | ((brightness >> 2) << 5) | (brightness >> 3);
+                    fb.fillCircle(px, py, 1, col);
+                }
+            } else if (weatherIsReady()) {
                 String numStr = String(weatherGetTemp());
                 fb.setFreeFont(&FreeSansBold12pt7b);
                 int numW = fb.textWidth(numStr);
