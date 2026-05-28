@@ -76,7 +76,8 @@ enum CatAction {
     ACT_IDLE,   // just standing
     ACT_WAVE,   // waving (WAVEA/WAVEB alternating)
     ACT_LOVE,   // happy face
-    ACT_NAP     // short nap (sleep + zzz, then yawn on wake)
+    ACT_NAP,    // short nap (sleep + zzz, then yawn on wake)
+    ACT_WALK    // walk right and back
 };
 
 static CatAction currentAction = ACT_IDLE;
@@ -89,6 +90,11 @@ static const unsigned long WAVE_DURATION   = 2000;
 static const unsigned long LOVE_DURATION   = 2500;
 static const unsigned long NAP_DURATION_MIN = 8000;
 static const unsigned long NAP_DURATION_MAX = 15000;
+static const unsigned long WALK_DURATION_MIN = 4000;
+static const unsigned long WALK_DURATION_MAX = 6000;
+
+// Walk state
+static int walkDistance = 0;  // how far right to walk (px)
 
 // Interval between actions (ms)
 static const unsigned long ACTION_INTERVAL_MIN = 8000;
@@ -96,15 +102,19 @@ static const unsigned long ACTION_INTERVAL_MAX = 25000;
 
 static void pickRandomAction(unsigned long now) {
     int r = random(100);
-    if (r < 35) {
+    if (r < 25) {
         currentAction = ACT_WAVE;
         actionDurationMs = WAVE_DURATION;
-    } else if (r < 60) {
+    } else if (r < 45) {
         currentAction = ACT_LOVE;
         actionDurationMs = LOVE_DURATION;
-    } else if (r < 80) {
+    } else if (r < 60) {
         currentAction = ACT_NAP;
         actionDurationMs = random(NAP_DURATION_MIN, NAP_DURATION_MAX);
+    } else if (r < 80) {
+        currentAction = ACT_WALK;
+        actionDurationMs = random(WALK_DURATION_MIN, WALK_DURATION_MAX);
+        walkDistance = random(20, 45);
     } else {
         // Stay idle for this round
         currentAction = ACT_IDLE;
@@ -155,6 +165,20 @@ struct Zzz {
 };
 static Zzz zzs[MAX_ZS];
 static unsigned long lastZSpawn = 0;
+
+// ---- Hearts ----
+static const int MAX_HEARTS = 5;
+static const unsigned long HEART_SPAWN_MS = 400;
+
+struct Heart {
+    float x, y;
+    float vx, vy;
+    uint16_t age;
+    bool active;
+    uint8_t size;  // 0=small, 1=medium, 2=large
+};
+static Heart hearts[MAX_HEARTS];
+static unsigned long lastHeartSpawn = 0;
 
 // Error sprite scaled to same size as cat
 static const int ERR_DRAW_W = CAT_DRAW_W;
@@ -276,6 +300,53 @@ static void updateAndDrawZs() {
             continue;
         }
         drawZ((int)(zzs[i].x + wx), (int)zzs[i].y);
+    }
+}
+
+// ---- Heart spawn/update/draw ----
+
+static void drawHeart(int cx, int cy, int size, uint16_t col) {
+    // Procedural heart shape scaled by size (0=3px, 1=5px, 2=7px)
+    int r = size + 2;  // radius: 2, 3, 4
+    // Two circles for top bumps
+    fb.fillCircle(cx - r / 2, cy, r, col);
+    fb.fillCircle(cx + r / 2, cy, r, col);
+    // Triangle for bottom point
+    fb.fillTriangle(cx - r - r / 2, cy + 1,
+                    cx + r + r / 2, cy + 1,
+                    cx, cy + r * 2, col);
+}
+
+static void spawnHeart(int headX, int headY) {
+    for (int i = 0; i < MAX_HEARTS; i++) {
+        if (!hearts[i].active) {
+            hearts[i].active = true;
+            hearts[i].x  = headX + random(-15, 16);
+            hearts[i].y  = headY;
+            hearts[i].vx = random(-15, 16) * 0.03f;
+            hearts[i].vy = -0.5f - random(0, 40) * 0.01f;
+            hearts[i].age = 0;
+            hearts[i].size = random(3);
+            return;
+        }
+    }
+}
+
+static void updateAndDrawHearts() {
+    for (int i = 0; i < MAX_HEARTS; i++) {
+        if (!hearts[i].active) continue;
+        hearts[i].x += hearts[i].vx;
+        hearts[i].y += hearts[i].vy;
+        hearts[i].age++;
+        float wobble = sinf(hearts[i].age * 0.08f) * 1.5f;
+        if (hearts[i].y < -10 || hearts[i].age > 120) {
+            hearts[i].active = false;
+            continue;
+        }
+        // Alternate between pink and highlight
+        uint16_t col = (hearts[i].age % 20 < 10) ? COL_HEART : COL_HEART_HI;
+        drawHeart((int)(hearts[i].x + wobble), (int)hearts[i].y,
+                  hearts[i].size, col);
     }
 }
 
@@ -596,6 +667,10 @@ static int chooseCatFrame(unsigned long now, AppState appState) {
                 return CAT_FRAME_LOVE;
             case ACT_NAP:
                 return CAT_FRAME_SLEEP;
+            case ACT_WALK: {
+                int walkFrame = ((now / 250) % 2 == 0) ? CAT_FRAME_WAVEA : CAT_FRAME_WAVEB;
+                return walkFrame;
+            }
             default:
                 break;
         }
@@ -638,6 +713,7 @@ void renderSetup() {
     nextBtfAt = millis() + random(2000, 6000);
     for (int i = 0; i < MAX_BUTTERFLIES; i++) btfs[i].active = false;
     for (int i = 0; i < MAX_ZS; i++) zzs[i].active = false;
+    for (int i = 0; i < MAX_HEARTS; i++) hearts[i].active = false;
     randomSeed(esp_random());
 }
 
@@ -677,24 +753,46 @@ void renderFrame(AppState state) {
     int frame = chooseCatFrame(now, state);
     bool sleeping = (frame == CAT_FRAME_SLEEP);
 
+    // Breathing bob when sleeping
+    int bob = 0;
+    if (sleeping) {
+        bob = (int)(sinf(now * 0.0018f) * 2.0f);
+    }
+
+    // Walk offset: cat moves right then back with ease-in-out
+    int walkOX = 0;
+    int walkBob = 0;
+    bool walkFlip = false;
+    bool walking = (currentAction == ACT_WALK) && ((now - actionStartMs) < actionDurationMs);
+    if (walking) {
+        float t = (float)(now - actionStartMs) / (float)actionDurationMs;
+        float phase = (t < 0.5f) ? (t * 2.0f) : (2.0f - t * 2.0f);
+        phase = phase * phase * (3.0f - 2.0f * phase);  // ease-in-out
+        walkOX = (int)(phase * walkDistance);
+        walkBob = (int)(sinf(now * 0.012f) * 2.0f);
+        walkFlip = (t > 0.5f);
+    }
+
+    int catX = CAT_OX + walkOX;
+    int catY = CAT_OY + bob + walkBob;
+
     // Spawn butterflies periodically
     if (now >= nextBtfAt) {
         spawnButterfly();
         nextBtfAt = now + random(BTF_SPAWN_MIN, BTF_SPAWN_MAX);
     }
 
-    // Spawn Zzz when sleeping
-    if (sleeping && (now - lastZSpawn >= Z_SPAWN_MS)) {
-        int headX = CAT_OX + CAT_DRAW_W / 2 - (9 * Z_SCALE) / 2;
-        int headY = CAT_OY + CAT_DRAW_H / 4;
-        spawnZ(headX, headY);
-        lastZSpawn = now;
+    // Spawn hearts during LOVE action
+    bool loving = (frame == CAT_FRAME_LOVE);
+    if (loving && (now - lastHeartSpawn >= HEART_SPAWN_MS)) {
+        spawnHeart(catX + CAT_DRAW_W / 2, catY + CAT_DRAW_H / 4);
+        lastHeartSpawn = now;
     }
 
-    // Breathing bob when sleeping (sin wave, ~1-2px vertical)
-    int bob = 0;
-    if (sleeping) {
-        bob = (int)(sinf(now * 0.0018f) * 2.0f);
+    // Spawn Zzz when sleeping
+    if (sleeping && (now - lastZSpawn >= Z_SPAWN_MS)) {
+        spawnZ(catX + CAT_DRAW_W / 2 - (9 * Z_SCALE) / 2, catY + CAT_DRAW_H / 4);
+        lastZSpawn = now;
     }
 
     fb.fillSprite(COL_BG);
@@ -702,11 +800,17 @@ void renderFrame(AppState state) {
     // Butterflies behind cat
     updateAndDrawButterflies();
 
-    if (!sleeping) drawScene();
-    drawCatFrame(CAT_OX, CAT_OY + bob, frame);
+    // Shadow follows cat
+    if (!sleeping) {
+        int sx = catX + CAT_DRAW_W / 2;
+        int sy = CAT_OY + CAT_DRAW_H - 10;
+        fb.fillEllipse(sx, sy, 28, 3, COL_SHADOW);
+    }
+    drawCatFrame(catX, catY, frame, walkFlip);
 
-    // Zzz in front of cat
+    // Zzz and hearts in front of cat
     updateAndDrawZs();
+    updateAndDrawHearts();
 
     // Right side: alert text OR clock
     if (state == STATE_ALERT) {
