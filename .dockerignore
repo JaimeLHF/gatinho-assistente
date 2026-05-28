@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+.pio
+firmware/build
+.git
+.env
+.env.local
+*.log
+.vscode
+.idea
+.DS_Store
