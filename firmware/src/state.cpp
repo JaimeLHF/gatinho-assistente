@@ -133,7 +133,7 @@ void stateSetEvent(const String& eventJson) {
     }
 
     currentEvent.title              = doc["title"].as<String>();
-    currentEvent.description        = doc["description"].as<String>();
+    currentEvent.description        = doc["description"].is<const char*>() ? doc["description"].as<String>() : "";
     currentEvent.startsAt           = doc["startsAt"].as<String>();
     currentEvent.alertMinutesBefore = doc["alertMinutesBefore"] | 5;
     currentEvent.valid              = true;

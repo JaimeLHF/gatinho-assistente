@@ -1207,10 +1207,16 @@ void renderFrame(AppState state) {
 
             // Description (centered, word-wrapped, subtle)
             int descY = 50;
-            if (ev.description.length() > 0) {
-                String desc = stripAccents(ev.description);
+            String desc = ev.description;
+            desc.trim();
+            if (desc.length() > 0) {
+                desc = stripAccents(desc);
                 fb.setTextColor(COL_TEXT, COL_BG);
                 descY = drawWrappedText(desc, TEXT_AREA_CX, descY, areaW, 2, 16);
+            } else {
+                fb.setTextColor(COL_TEXT_DIM, COL_BG);
+                fb.drawString("- - -", TEXT_AREA_CX, descY, 2);
+                descY += 16;
             }
 
             // Time + countdown at bottom with clock icon
