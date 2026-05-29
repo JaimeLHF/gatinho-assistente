@@ -382,12 +382,10 @@ static void buildColorLUT(const CatColors& cc) {
         rgbToHsl(rr, rg, rb, refH[i], refS[i], refL[i]);
     }
 
-    // Delta per region
-    float dh[NUM_REGIONS], ds[NUM_REGIONS], dl[NUM_REGIONS];
+    // Hue delta per region (additive)
+    float dh[NUM_REGIONS];
     for (int i = 0; i < NUM_REGIONS; i++) {
         dh[i] = targetH[i] - refH[i];
-        ds[i] = targetS[i] - refS[i];
-        dl[i] = targetL[i] - refL[i];
     }
 
     // Clear LUT
@@ -417,8 +415,13 @@ static void buildColorLUT(const CatColors& cc) {
             rgbToHsl(pr, pg, pb, ph, ps, pl);
 
             float nh = fmodf(ph + dh[region] + 1.0f, 1.0f);
-            float ns = constrain(ps + ds[region], 0.0f, 1.0f);
-            float nl = constrain(pl + dl[region], 0.0f, 1.0f);
+            // Ratio-based S/L to preserve shading across large color shifts
+            float ns = (refS[region] > 0.01f)
+                ? constrain(ps * (targetS[region] / refS[region]), 0.0f, 1.0f)
+                : targetS[region];
+            float nl = (refL[region] > 0.01f)
+                ? constrain(pl * (targetL[region] / refL[region]), 0.0f, 1.0f)
+                : constrain(pl + targetL[region], 0.0f, 1.0f);
 
             uint8_t nr, ng, nb;
             hslToRgb(nh, ns, nl, nr, ng, nb);

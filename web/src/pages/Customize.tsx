@@ -76,6 +76,29 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
 type RegionName = "outline" | "stripes" | "body" | "belly" | "eyes" | "nose";
 type ColorMap = Record<RegionName, string>;
 
+// Remap a pixel's HSL using ratio-based S/L (preserves shading) + additive H
+interface RegionShift {
+  dh: number;
+  refS: number;
+  refL: number;
+  targetS: number;
+  targetL: number;
+}
+
+function remapPixelHsl(
+  ph: number, ps: number, pl: number,
+  shift: RegionShift,
+): [number, number, number] {
+  const nh = (((ph + shift.dh) % 1) + 1) % 1;
+  const ns = shift.refS > 0.01
+    ? Math.min(1, ps * (shift.targetS / shift.refS))
+    : shift.targetS;
+  const nl = shift.refL > 0.01
+    ? Math.min(1, pl * (shift.targetL / shift.refL))
+    : Math.min(1, pl + shift.targetL);
+  return [nh, ns, nl];
+}
+
 function defaultColors(): ColorMap {
   return {
     outline: "#000000",
@@ -114,6 +137,17 @@ const PRESETS: CatPreset[] = [
   { name: "Siames",       colors: { outline: "#2A1A0A", stripes: "#6B4430", body: "#D4B896", belly: "#EAD8C0", eyes: "#4499DD", nose: "#C49A7A" } },
 ];
 
+// Build shift table from color map
+function buildShifts(colorMap: ColorMap): Record<number, RegionShift> {
+  const shifts: Record<number, RegionShift> = {};
+  for (const region of REGIONS) {
+    const [refH, refS, refL] = hexToHsl(region.defaultColor);
+    const [newH, newS, newL] = hexToHsl(colorMap[region.name as RegionName]);
+    shifts[region.id] = { dh: newH - refH, refS, refL, targetS: newS, targetL: newL };
+  }
+  return shifts;
+}
+
 // Render the cat sprite into a small data URL with given colors
 function renderPresetThumb(
   sprite: Uint8Array,
@@ -126,13 +160,7 @@ function renderPresetThumb(
   const ctx = canvas.getContext("2d")!;
   const imageData = ctx.createImageData(CAT_W, CAT_H);
   const data = imageData.data;
-
-  const shifts: Record<number, { dh: number; ds: number; dl: number }> = {};
-  for (const region of REGIONS) {
-    const [refH, refS, refL] = hexToHsl(region.defaultColor);
-    const [newH, newS, newL] = hexToHsl(presetColors[region.name as RegionName]);
-    shifts[region.id] = { dh: newH - refH, ds: newS - refS, dl: newL - refL };
-  }
+  const shifts = buildShifts(presetColors);
 
   for (let i = 0; i < CAT_W * CAT_H; i++) {
     const region = regionMap[i] as number;
@@ -144,9 +172,7 @@ function renderPresetThumb(
     const shift = shifts[region];
     if (!shift) { data[si] = r; data[si + 1] = g; data[si + 2] = b; data[si + 3] = 255; continue; }
     const [ph, ps, pl] = rgbToHsl(r, g, b);
-    const nh = (((ph + shift.dh) % 1) + 1) % 1;
-    const ns = Math.max(0, Math.min(1, ps + shift.ds));
-    const nl = Math.max(0, Math.min(1, pl + shift.dl));
+    const [nh, ns, nl] = remapPixelHsl(ph, ps, pl, shift);
     const [nr, ng, nb] = hslToRgb(nh, ns, nl);
     data[si] = nr; data[si + 1] = ng; data[si + 2] = nb; data[si + 3] = 255;
   }
@@ -250,23 +276,7 @@ export default function Customize() {
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Precompute HSL shifts per region
-    const shifts: Record<
-      number,
-      { dh: number; ds: number; dl: number; refH: number; refS: number; refL: number }
-    > = {};
-    for (const region of REGIONS) {
-      const [refH, refS, refL] = hexToHsl(region.defaultColor);
-      const [newH, newS, newL] = hexToHsl(getColor(colors, region.name) ?? region.defaultColor);
-      shifts[region.id] = {
-        dh: newH - refH,
-        ds: newS - refS,
-        dl: newL - refL,
-        refH,
-        refS,
-        refL,
-      };
-    }
+    const shifts = buildShifts(colors);
 
     const imageData = ctx.createImageData(CAT_W, CAT_H);
     const data = imageData.data;
@@ -289,11 +299,8 @@ export default function Customize() {
         continue;
       }
 
-      // Get pixel HSL, apply shift
       const [ph, ps, pl] = rgbToHsl(r, g, b);
-      const nh = (((ph + shift.dh) % 1) + 1) % 1;
-      const ns = Math.max(0, Math.min(1, ps + shift.ds));
-      const nl = Math.max(0, Math.min(1, pl + shift.dl));
+      const [nh, ns, nl] = remapPixelHsl(ph, ps, pl, shift);
       const [nr, ng, nb] = hslToRgb(nh, ns, nl);
 
       data[si] = nr;
