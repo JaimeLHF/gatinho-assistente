@@ -19,7 +19,7 @@ static const int H = 170;
 static const int CX = W / 2;
 
 // ---- Colors (RGB565 native — sem swap, sem inversao) ----
-static const uint16_t COL_BG        = 0x3186;  // cinza chumbo escuro
+static const uint16_t COL_BG        = 0x0000;  // preto
 static const uint16_t COL_GROUND    = 0x6BC4;  // earthy olive
 static const uint16_t COL_GROUND_HI = 0x8C68;  // ground highlight
 static const uint16_t COL_SHADOW    = 0x18E3;  // sombra mais sutil
@@ -54,8 +54,9 @@ static const int BTN_KEY  = 14;  // GPIO 14 (KEY)
 static unsigned long lastInteraction = 0;
 
 // Clock digit slide animation
-static char prevClock[6] = {'-','-',':','-','-','\0'};
-static unsigned long clockAnimMs[5] = {0,0,0,0,0};
+static const int CLOCK_MAX_CHARS = 8;  // "12:30PM\0"
+static char prevClock[CLOCK_MAX_CHARS + 1] = "";
+static unsigned long clockAnimMs[CLOCK_MAX_CHARS] = {};
 static const unsigned long CLOCK_ANIM_MS = 250;
 static const int CLOCK_SLIDE_PX = 14;
 
@@ -196,6 +197,74 @@ static void drawErrorFrame(int ox, int oy) {
             fb.drawPixel(ox + dx, oy + dy, p);
         }
     }
+}
+
+// ---- Text helpers ----
+
+// Strip UTF-8 accents to ASCII equivalents for TFT fonts
+static String stripAccents(const String& s) {
+    String out;
+    out.reserve(s.length());
+    for (unsigned int i = 0; i < s.length(); i++) {
+        uint8_t c = (uint8_t)s[i];
+        if (c == 0xC3 && i + 1 < s.length()) {
+            uint8_t n = (uint8_t)s[i + 1];
+            i++;
+            // Lowercase: à-å→a, è-ë→e, ì-ï→i, ò-ö→o, ù-ü→u, ñ→n, ý→y
+            if (n >= 0xA0 && n <= 0xA5) out += 'a';
+            else if (n == 0xA7) out += 'c';  // ç
+            else if (n >= 0xA8 && n <= 0xAB) out += 'e';
+            else if (n >= 0xAC && n <= 0xAF) out += 'i';
+            else if (n == 0xB1) out += 'n';  // ñ
+            else if (n >= 0xB2 && n <= 0xB6) out += 'o';
+            else if (n >= 0xB9 && n <= 0xBC) out += 'u';
+            else if (n == 0xBD) out += 'y';
+            // Uppercase
+            else if (n >= 0x80 && n <= 0x85) out += 'A';
+            else if (n == 0x87) out += 'C';
+            else if (n >= 0x88 && n <= 0x8B) out += 'E';
+            else if (n >= 0x8C && n <= 0x8F) out += 'I';
+            else if (n == 0x91) out += 'N';
+            else if (n >= 0x92 && n <= 0x96) out += 'O';
+            else if (n >= 0x99 && n <= 0x9C) out += 'U';
+            else if (n == 0x9D) out += 'Y';
+            else out += '?';
+        } else if (c < 0x80) {
+            out += (char)c;
+        }
+        // Skip other multi-byte sequences
+    }
+    return out;
+}
+
+// Draw word-wrapped text centered, returns Y after last line
+static int drawWrappedText(const String& text, int cx, int y, int maxW, int font, int lineH) {
+    String remaining = text;
+    while (remaining.length() > 0 && y < H - 10) {
+        // Find how many chars fit in maxW
+        String line = remaining;
+        while (fb.textWidth(line, font) > maxW && line.length() > 0) {
+            // Try to break at last space
+            int lastSpace = line.lastIndexOf(' ');
+            if (lastSpace > 0) {
+                line = line.substring(0, lastSpace);
+            } else {
+                line = line.substring(0, line.length() - 1);
+            }
+        }
+        fb.drawString(line, cx, y, font);
+        y += lineH;
+        remaining = remaining.substring(line.length());
+        remaining.trim();
+    }
+    return y;
+}
+
+// Draw a small clock icon (circle + hands)
+static void drawClockIcon(int cx, int cy, int r, uint16_t col) {
+    fb.drawCircle(cx, cy, r, col);
+    fb.drawLine(cx, cy, cx, cy - r + 2, col);       // 12 o'clock hand
+    fb.drawLine(cx, cy, cx + r - 2, cy, col);        // 3 o'clock hand
 }
 
 static void drawCatFrame(int ox, int oy, int frameIdx, bool flip = false) {
@@ -753,10 +822,13 @@ void renderFrame(AppState state) {
     int frame = chooseCatFrame(now, state);
     bool sleeping = (frame == CAT_FRAME_SLEEP);
 
-    // Breathing bob when sleeping
+    // Breathing bob when sleeping, bounce when alert
     int bob = 0;
     if (sleeping) {
         bob = (int)(sinf(now * 0.0018f) * 2.0f);
+    } else if (state == STATE_ALERT) {
+        float bounce = sinf(now * 0.006f);
+        bob = (bounce > 0) ? (int)(-bounce * 5.0f) : 0;  // jump up only
     }
 
     // Walk offset: cat moves right then back with ease-in-out
@@ -816,35 +888,65 @@ void renderFrame(AppState state) {
     if (state == STATE_ALERT) {
         EventData ev = stateGetEvent();
         if (ev.valid && ev.title.length() > 0) {
-            String title = ev.title;
-            if (title.length() > 18) title = title.substring(0, 17) + "..";
+            String title = stripAccents(ev.title);
+            if (title.length() > 20) title = title.substring(0, 19) + "..";
+            int areaW = TEXT_AREA_W - 8;
+
+            // Title (top, orange)
             fb.setTextDatum(TC_DATUM);
             fb.setTextColor(COL_ALERT_FG, COL_BG);
-            fb.drawString(title, TEXT_AREA_CX, 50, 4);
+            fb.drawString(title, TEXT_AREA_CX, 20, 4);
+
+            // Description (centered, word-wrapped, subtle)
+            int descY = 50;
+            if (ev.description.length() > 0) {
+                String desc = stripAccents(ev.description);
+                fb.setTextColor(COL_TEXT, COL_BG);
+                descY = drawWrappedText(desc, TEXT_AREA_CX, descY, areaW, 2, 16);
+            }
+
+            // Time + countdown at bottom with clock icon
             int mins = stateMinutesUntilEvent();
             if (mins >= 0) {
-                fb.setTextColor(COL_TEXT, COL_BG);
-                fb.drawString(mins == 0 ? "Agora" : "em " + String(mins) + " min", TEXT_AREA_CX, 80, 2);
+                String timeStr = timeSyncGetHHMM();
+                String countdown = (mins == 0)
+                    ? timeStr + " - Agora!"
+                    : timeStr + " em " + String(mins) + " min";
+                int font = 2;  // font between 2 (small) and 4 (large)
+                fb.setFreeFont(&FreeSans9pt7b);
+                int cw = fb.textWidth(countdown);
+                int totalW = 12 + 4 + cw;  // icon + gap + text
+                int startX = TEXT_AREA_CX - totalW / 2;
+                int bottomY = H - 55;
+
+                fb.setTextColor(COL_TEXT_DIM, COL_BG);
+                drawClockIcon(startX + 5, bottomY + 6, 4, COL_TEXT_DIM);
+                fb.setTextDatum(TL_DATUM);
+                fb.drawString(countdown, startX + 14, bottomY);
+                fb.setTextFont(1);  // reset
             }
         }
     } else {
         if (timeSyncIsReady()) {
             String timeStr = timeSyncGetHHMM();
+            int len = timeStr.length();
+            if (len > CLOCK_MAX_CHARS) len = CLOCK_MAX_CHARS;
 
             // Detect digit changes and trigger animation
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < len; i++) {
                 if (timeStr[i] != prevClock[i]) {
                     clockAnimMs[i] = now;
                     prevClock[i] = timeStr[i];
                 }
             }
+            prevClock[len] = '\0';
 
             // Draw each character with individual slide animation
             int totalW = fb.textWidth(timeStr, 7);
-            int penX = TEXT_AREA_CX - totalW / 2 - 6;  // nudge left for visual balance
+            int penX = TEXT_AREA_CX - totalW / 2;
             fb.setTextDatum(TL_DATUM);
 
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < len; i++) {
                 char ch[2] = {timeStr[i], '\0'};
                 int chW = fb.textWidth(ch, 7);
 
@@ -911,6 +1013,13 @@ void renderFrame(AppState state) {
             fb.drawString("--:--", TEXT_AREA_CX, 30, 7);
             fb.drawString("Sincronizando...", TEXT_AREA_CX, 85, 2);
         }
+    }
+
+    // IP address in bottom-right corner
+    if (WiFi.status() == WL_CONNECTED) {
+        fb.setTextDatum(BR_DATUM);
+        fb.setTextColor(0x4228);  // very dim gray
+        fb.drawString(WiFi.localIP().toString(), W - 4, H - 3, 1);
     }
 
     drawResetOverlay();

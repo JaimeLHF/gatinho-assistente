@@ -13,6 +13,7 @@ enum AppState {
 
 struct EventData {
     String title;
+    String description;
     String startsAt;
     int    alertMinutesBefore;
     bool   valid;

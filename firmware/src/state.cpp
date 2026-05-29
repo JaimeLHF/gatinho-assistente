@@ -7,7 +7,7 @@
 #include <time.h>
 
 static AppState    currentState = STATE_CONNECTING;
-static EventData   currentEvent = { "", "", 5, false };
+static EventData   currentEvent = { "", "", "", 5, false };
 static unsigned long lastPollMs = 0;
 static bool        firstPoll   = true;
 static String      dismissedStartsAt = "";
@@ -131,6 +131,7 @@ void stateSetEvent(const String& eventJson) {
     }
 
     currentEvent.title              = doc["title"].as<String>();
+    currentEvent.description        = doc["description"].as<String>();
     currentEvent.startsAt           = doc["startsAt"].as<String>();
     currentEvent.alertMinutesBefore = doc["alertMinutesBefore"] | 5;
     currentEvent.valid              = true;
