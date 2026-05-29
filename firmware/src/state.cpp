@@ -8,7 +8,7 @@
 
 static AppState    currentState = STATE_CONNECTING;
 static EventData   currentEvent = { "", "", "", 5, false };
-static CatColors   currentColors = { "", "", "", "", "", "", false };
+static CatColors   currentColors = { "", "", "", "", "", "", "", "", false };
 static unsigned long lastPollMs = 0;
 static bool        firstPoll   = true;
 static String      dismissedStartsAt = "";
@@ -189,6 +189,8 @@ void stateSetColors(const String& colorsJson) {
     currentColors.outline = doc["outline"].as<String>();
     currentColors.eyes    = doc["eyes"].as<String>();
     currentColors.nose    = doc["nose"].as<String>();
+    currentColors.bgType  = doc["bgType"] | "solid";
+    currentColors.bgColor = doc["bgColor"] | "#000000";
     currentColors.valid   = true;
     Serial.println("[state] custom colors loaded");
 }

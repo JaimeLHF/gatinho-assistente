@@ -456,6 +456,104 @@ static inline uint16_t remapColor(uint16_t p) {
     return p;
 }
 
+// ---- Custom background rendering ----
+
+static uint16_t customBgColor = 0x0000;
+static String   customBgType = "";
+
+// Deterministic stars (same positions every frame)
+static const int NUM_STARS = 50;
+static uint16_t starX[NUM_STARS];
+static uint16_t starY[NUM_STARS];
+static uint8_t  starSize[NUM_STARS];
+static bool     starsInit = false;
+
+static void initStars() {
+    if (starsInit) return;
+    for (int i = 0; i < NUM_STARS; i++) {
+        starX[i] = (i * 137 + 59) % W;
+        starY[i] = (i * 97 + 23) % H;
+        starSize[i] = (i % 4 == 0) ? 2 : 1;
+    }
+    starsInit = true;
+}
+
+static void drawCustomBackground() {
+    if (customBgType == "stars") {
+        fb.fillSprite(0x0011);  // very dark navy
+        initStars();
+        for (int i = 0; i < NUM_STARS; i++) {
+            uint16_t col = (starSize[i] > 1) ? 0xFFFF : 0xC618;
+            fb.fillRect(starX[i], starY[i], starSize[i], starSize[i], col);
+        }
+    } else if (customBgType == "sky") {
+        // Blue gradient top → green ground bottom
+        for (int y = 0; y < H; y++) {
+            uint16_t col;
+            if (y < H * 7 / 10) {
+                // Sky gradient: light blue to white-blue
+                int t = y * 255 / (H * 7 / 10);
+                uint8_t r = 85 + t * 85 / 255;
+                uint8_t g = 153 + t * 68 / 255;
+                uint8_t b = 221;
+                col = rgbToRgb565(r, g, b);
+            } else {
+                // Ground: green
+                int t = (y - H * 7 / 10) * 255 / (H * 3 / 10);
+                uint8_t r = 85 - t * 34 / 255;
+                uint8_t g = 170 - t * 68 / 255;
+                uint8_t b = 68 - t * 34 / 255;
+                col = rgbToRgb565(r, g, b);
+            }
+            fb.drawFastHLine(0, y, W, col);
+        }
+    } else if (customBgType == "sunset") {
+        for (int y = 0; y < H; y++) {
+            uint16_t col;
+            if (y < H * 7 / 10) {
+                float t = (float)y / (H * 7 / 10);
+                uint8_t r, g, b;
+                if (t < 0.5f) {
+                    float s = t * 2;
+                    r = 42 + (int)(162 * s);
+                    g = 27 + (int)(41 * s);
+                    b = 78 - (int)(s * 60);
+                } else {
+                    float s = (t - 0.5f) * 2;
+                    r = 204 + (int)(51 * s);
+                    g = 68 + (int)(68 * s);
+                    b = 18 + (int)(50 * s);
+                }
+                col = rgbToRgb565(r, g, b);
+            } else {
+                col = rgbToRgb565(51, 68, 51);
+            }
+            fb.drawFastHLine(0, y, W, col);
+        }
+    } else if (customBgType == "field") {
+        for (int y = 0; y < H; y++) {
+            uint16_t col;
+            if (y < H * 65 / 100) {
+                int t = y * 255 / (H * 65 / 100);
+                uint8_t r = 136 - t * 34 / 255;
+                uint8_t g = 204 - t * 68 / 255;
+                uint8_t b = 85 - t * 34 / 255;
+                col = rgbToRgb565(r, g, b);
+            } else {
+                int t = (y - H * 65 / 100) * 255 / (H * 35 / 100);
+                uint8_t r = 119 - t * 34 / 255;
+                uint8_t g = 85 - t * 17 / 255;
+                uint8_t b = 51 - t * 17 / 255;
+                col = rgbToRgb565(r, g, b);
+            }
+            fb.drawFastHLine(0, y, W, col);
+        }
+    } else {
+        // "solid" or unknown — use custom color
+        fb.fillSprite(customBgColor);
+    }
+}
+
 static void drawCatFrame(int ox, int oy, int frameIdx, bool flip = false) {
     for (int dy = 0; dy < CAT_DRAW_H; dy++) {
         int sy = dy * CAT_FRAME_H / CAT_DRAW_H;
@@ -1006,13 +1104,20 @@ void renderFrame(AppState state) {
         return;
     }
 
-    // Update color LUT if custom colors are set
+    // Update color LUT and background from custom colors
     CatColors cc = stateGetColors();
     if (cc.valid) {
         buildColorLUT(cc);
+        customBgType = cc.bgType;
+        if (cc.bgColor.length() == 7) {
+            uint8_t r, g, b;
+            parseHex(cc.bgColor, r, g, b);
+            customBgColor = rgbToRgb565(r, g, b);
+        }
     } else if (cltActive) {
         cltActive = false;
         cltFingerprint = "";
+        customBgType = "";
     }
 
     // IDLE or ALERT
@@ -1065,7 +1170,12 @@ void renderFrame(AppState state) {
         lastZSpawn = now;
     }
 
-    fb.fillSprite(COL_BG);
+    // Draw background (custom or default)
+    if (customBgType.length() > 0) {
+        drawCustomBackground();
+    } else {
+        fb.fillSprite(COL_BG);
+    }
 
     // Butterflies behind cat
     updateAndDrawButterflies();

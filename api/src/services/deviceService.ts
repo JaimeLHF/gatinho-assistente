@@ -128,7 +128,7 @@ export async function nextEvent(deviceId: string, userId: string) {
     }),
     prisma.deviceCustomization.findUnique({
       where: { deviceId },
-      select: { body: true, stripes: true, belly: true, outline: true, eyes: true, nose: true },
+      select: { body: true, stripes: true, belly: true, outline: true, eyes: true, nose: true, bgType: true, bgColor: true },
     }),
   ]);
 

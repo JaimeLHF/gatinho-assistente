@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as devicesApi from "../api/devices";
 import { useToast } from "../hooks/useToast";
+import type { BgType } from "../types";
 import {
   CAT_W,
   CAT_H,
@@ -114,6 +115,82 @@ function getColor(map: ColorMap, name: string): string {
   return map[name as RegionName] ?? "#000000";
 }
 
+// --- Background presets ---
+
+interface BgPreset {
+  type: BgType;
+  label: string;
+  render: (ctx: CanvasRenderingContext2D, w: number, h: number, color: string) => void;
+}
+
+function drawSolidBg(ctx: CanvasRenderingContext2D, w: number, h: number, color: string) {
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function drawStarsBg(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.fillStyle = "#0A0A2A";
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = "#FFFFFF";
+  // Deterministic stars using simple hash
+  for (let i = 0; i < 40; i++) {
+    const x = ((i * 137 + 59) % w);
+    const y = ((i * 97 + 23) % h);
+    const s = (i % 3 === 0) ? 2 : 1;
+    ctx.fillRect(x, y, s, s);
+  }
+}
+
+function drawSkyBg(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "#5599DD");
+  grad.addColorStop(0.7, "#AADDFF");
+  grad.addColorStop(0.7, "#55AA44");
+  grad.addColorStop(1, "#337722");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function drawSunsetBg(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "#2A1B4E");
+  grad.addColorStop(0.4, "#CC4455");
+  grad.addColorStop(0.7, "#FF8844");
+  grad.addColorStop(0.7, "#334433");
+  grad.addColorStop(1, "#1A2A1A");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function drawFieldBg(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "#88CC55");
+  grad.addColorStop(0.65, "#66AA33");
+  grad.addColorStop(0.65, "#775533");
+  grad.addColorStop(1, "#554422");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
+const BG_PRESETS: BgPreset[] = [
+  { type: "solid",  label: "Solido",     render: drawSolidBg },
+  { type: "stars",  label: "Noite",      render: (_ctx, w, h) => drawStarsBg(_ctx, w, h) },
+  { type: "sky",    label: "Ceu",        render: (ctx, w, h) => drawSkyBg(ctx, w, h) },
+  { type: "sunset", label: "Por do sol", render: (ctx, w, h) => drawSunsetBg(ctx, w, h) },
+  { type: "field",  label: "Campo",      render: (ctx, w, h) => drawFieldBg(ctx, w, h) },
+];
+
+function renderBgThumb(preset: BgPreset, color: string): string {
+  const tw = 64;
+  const th = 34;
+  const canvas = document.createElement("canvas");
+  canvas.width = tw;
+  canvas.height = th;
+  const ctx = canvas.getContext("2d")!;
+  preset.render(ctx, tw, th, color);
+  return canvas.toDataURL();
+}
+
 // --- Cat model presets (based on reference pixel art sheet) ---
 
 interface CatPreset {
@@ -192,6 +269,7 @@ export default function Customize() {
 
   const [overrides, setOverrides] = useState<ColorMap | null>(null);
   const [highlightRegion, setHighlightRegion] = useState<RegionId | null>(null);
+  const [bgOverride, setBgOverride] = useState<{ type: BgType; color: string } | null>(null);
 
   // Decode sprite data lazily (runs once)
   const spriteData = useMemo(() => {
@@ -237,6 +315,16 @@ export default function Customize() {
     nose: existing.nose,
   } : defaultColors()), [overrides, existing]);
 
+  // Derive background: override > server > defaults
+  const bgType: BgType = bgOverride?.type ?? (existing?.bgType as BgType | undefined) ?? "solid";
+  const bgColor: string = bgOverride?.color ?? existing?.bgColor ?? "#000000";
+
+  // Background thumbnail previews
+  const bgThumbs = useMemo(
+    () => BG_PRESETS.map((p) => renderBgThumb(p, bgColor)),
+    [bgColor],
+  );
+
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -247,6 +335,8 @@ export default function Customize() {
         outline: colors.outline,
         eyes: colors.eyes,
         nose: colors.nose,
+        bgType,
+        bgColor,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customization", deviceId] });
@@ -260,6 +350,7 @@ export default function Customize() {
     mutationFn: () => devicesApi.deleteCustomization(deviceId!),
     onSuccess: () => {
       setOverrides(null);
+      setBgOverride(null);
       queryClient.invalidateQueries({ queryKey: ["customization", deviceId] });
       toast.success("Cores resetadas para o padrao");
     },
@@ -274,7 +365,10 @@ export default function Customize() {
     if (!canvas || !sprite || !regionMap) return;
 
     const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+
+    // Draw background first
+    const bgPreset = BG_PRESETS.find((p) => p.type === bgType);
+    (bgPreset ?? BG_PRESETS[0]!).render(ctx, CANVAS_W, CANVAS_H, bgColor);
 
     const shifts = buildShifts(colors);
 
@@ -329,7 +423,7 @@ export default function Customize() {
 
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(tmpCanvas, 0, 0, CANVAS_W, CANVAS_H);
-  }, [colors, highlightRegion]);
+  }, [colors, highlightRegion, bgType, bgColor]);
 
   useEffect(() => {
     renderCat();
@@ -452,6 +546,59 @@ export default function Customize() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Background */}
+          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-6 shadow-sm dark:shadow-black/10">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Fundo</h2>
+            <div className="flex flex-wrap gap-3">
+              {BG_PRESETS.map((preset, i) => (
+                <button
+                  key={preset.type}
+                  onClick={() => setBgOverride({ type: preset.type, color: bgColor })}
+                  className={`group flex flex-col items-center gap-1 rounded-xl p-2 border transition-all hover:scale-105 ${
+                    bgType === preset.type
+                      ? "border-indigo-500 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30"
+                      : "border-gray-100 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600"
+                  }`}
+                >
+                  <img
+                    src={bgThumbs[i]}
+                    alt={preset.label}
+                    className="w-16 h-9 rounded object-cover"
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                  <span className={`text-[10px] leading-tight transition-colors ${
+                    bgType === preset.type
+                      ? "text-indigo-600 dark:text-indigo-400 font-medium"
+                      : "text-gray-500 dark:text-slate-400"
+                  }`}>
+                    {preset.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {bgType === "solid" && (
+              <div className="flex items-center gap-3 mt-4">
+                <label htmlFor="bg-color" className="relative cursor-pointer">
+                  <input
+                    id="bg-color"
+                    type="color"
+                    value={bgColor}
+                    onChange={(e) => setBgOverride({ type: bgType, color: e.target.value })}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-10 h-10"
+                  />
+                  <div
+                    className="w-10 h-10 rounded-lg border-2 border-gray-300 dark:border-slate-600 shadow-sm"
+                    style={{ backgroundColor: bgColor }}
+                  />
+                </label>
+                <div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Cor de fundo</span>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 font-mono">{bgColor.toUpperCase()}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Actions */}

@@ -14,6 +14,8 @@ export const updateDeviceSchema = z.object({
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
+const bgType = z.enum(["solid", "stars", "sky", "sunset", "field"]);
+
 export const customizationSchema = z.object({
   body: hexColor,
   stripes: hexColor,
@@ -21,6 +23,8 @@ export const customizationSchema = z.object({
   outline: hexColor,
   eyes: hexColor,
   nose: hexColor,
+  bgType: bgType,
+  bgColor: hexColor,
 });
 
 export type CreateDeviceInput = z.infer<typeof createDeviceSchema>;

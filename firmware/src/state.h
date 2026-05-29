@@ -27,6 +27,8 @@ struct CatColors {
     String outline;
     String eyes;
     String nose;
+    String bgType;   // "solid", "stars", "sky", "sunset", "field"
+    String bgColor;  // hex color for solid background
     bool   valid;
 };
 

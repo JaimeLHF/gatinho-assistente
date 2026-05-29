@@ -43,6 +43,8 @@ model DeviceCustomization {
   outline  String @default("#000000")
   eyes     String @default("#FFFFFF")
   nose     String @default("#FF9B9B")
+  bgType   String @default("solid")
+  bgColor  String @default("#000000")
   device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
   @@map("device_customizations")

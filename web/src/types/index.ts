@@ -35,6 +35,8 @@ export interface DeviceWithToken extends Device {
   token: string;
 }
 
+export type BgType = "solid" | "stars" | "sky" | "sunset" | "field";
+
 export interface CatCustomization {
   id?: string;
   deviceId?: string;
@@ -44,6 +46,8 @@ export interface CatCustomization {
   outline: string;
   eyes: string;
   nose: string;
+  bgType: BgType;
+  bgColor: string;
 }
 
 export interface ApiError {
