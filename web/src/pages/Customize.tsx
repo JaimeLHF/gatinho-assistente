@@ -91,6 +91,70 @@ function getColor(map: ColorMap, name: string): string {
   return map[name as RegionName] ?? "#000000";
 }
 
+// --- Cat model presets (based on reference pixel art sheet) ---
+
+interface CatPreset {
+  name: string;
+  colors: ColorMap;
+}
+
+const PRESETS: CatPreset[] = [
+  { name: "Original",     colors: defaultColors() },
+  { name: "Branco",       colors: { outline: "#333333", stripes: "#CCCCCC", body: "#EEEEEE", belly: "#FFFFFF", eyes: "#55AA55", nose: "#FFAAAA" } },
+  { name: "Cinza",        colors: { outline: "#111122", stripes: "#555570", body: "#7777AA", belly: "#9999BB", eyes: "#55CC55", nose: "#887788" } },
+  { name: "Prata",        colors: { outline: "#111111", stripes: "#555566", body: "#AAAABB", belly: "#DDDDEE", eyes: "#55BB55", nose: "#BBAAAA" } },
+  { name: "Preto",        colors: { outline: "#000000", stripes: "#1A1A22", body: "#222233", belly: "#333344", eyes: "#DDBB22", nose: "#333333" } },
+  { name: "Laranja",      colors: { outline: "#1A1000", stripes: "#CC8822", body: "#FFAA33", belly: "#FFCC66", eyes: "#55AA55", nose: "#FFBBAA" } },
+  { name: "Marrom",       colors: { outline: "#111105", stripes: "#664422", body: "#996644", belly: "#BB8866", eyes: "#55AA55", nose: "#AA8866" } },
+  { name: "Chocolate",    colors: { outline: "#0A0A00", stripes: "#442211", body: "#664433", belly: "#886655", eyes: "#55AA55", nose: "#775544" } },
+  { name: "Creme",        colors: { outline: "#222211", stripes: "#CC9955", body: "#EEBB77", belly: "#FFDDAA", eyes: "#55AA55", nose: "#DDBB99" } },
+  { name: "Cinza Tabby",  colors: { outline: "#000000", stripes: "#333344", body: "#666677", belly: "#888899", eyes: "#CCAA22", nose: "#666666" } },
+  { name: "Ruivo",        colors: { outline: "#110500", stripes: "#DD6622", body: "#FF8833", belly: "#FFBB66", eyes: "#55AA55", nose: "#FFAA88" } },
+  { name: "Caramelo",     colors: { outline: "#111005", stripes: "#885522", body: "#AA7744", belly: "#CC9966", eyes: "#55AA55", nose: "#BB9977" } },
+  { name: "Siames",       colors: { outline: "#2A1A0A", stripes: "#6B4430", body: "#D4B896", belly: "#EAD8C0", eyes: "#4499DD", nose: "#C49A7A" } },
+];
+
+// Render the cat sprite into a small data URL with given colors
+function renderPresetThumb(
+  sprite: Uint8Array,
+  regionMap: Uint8Array,
+  presetColors: ColorMap,
+): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = CAT_W;
+  canvas.height = CAT_H;
+  const ctx = canvas.getContext("2d")!;
+  const imageData = ctx.createImageData(CAT_W, CAT_H);
+  const data = imageData.data;
+
+  const shifts: Record<number, { dh: number; ds: number; dl: number }> = {};
+  for (const region of REGIONS) {
+    const [refH, refS, refL] = hexToHsl(region.defaultColor);
+    const [newH, newS, newL] = hexToHsl(presetColors[region.name as RegionName]);
+    shifts[region.id] = { dh: newH - refH, ds: newS - refS, dl: newL - refL };
+  }
+
+  for (let i = 0; i < CAT_W * CAT_H; i++) {
+    const region = regionMap[i] as number;
+    if (region === REGION_TRANSPARENT) continue;
+    const si = i * 4;
+    const r = sprite[si] as number;
+    const g = sprite[si + 1] as number;
+    const b = sprite[si + 2] as number;
+    const shift = shifts[region];
+    if (!shift) { data[si] = r; data[si + 1] = g; data[si + 2] = b; data[si + 3] = 255; continue; }
+    const [ph, ps, pl] = rgbToHsl(r, g, b);
+    const nh = (((ph + shift.dh) % 1) + 1) % 1;
+    const ns = Math.max(0, Math.min(1, ps + shift.ds));
+    const nl = Math.max(0, Math.min(1, pl + shift.dl));
+    const [nr, ng, nb] = hslToRgb(nh, ns, nl);
+    data[si] = nr; data[si + 1] = ng; data[si + 2] = nb; data[si + 3] = 255;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return canvas.toDataURL();
+}
+
 export default function Customize() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const navigate = useNavigate();
@@ -103,11 +167,24 @@ export default function Customize() {
   const [overrides, setOverrides] = useState<ColorMap | null>(null);
   const [highlightRegion, setHighlightRegion] = useState<RegionId | null>(null);
 
-  // Load sprite data once
-  useEffect(() => {
-    spriteRef.current = decodeSpriteRGBA();
-    regionRef.current = decodeRegionMap();
+  // Decode sprite data lazily (runs once)
+  const spriteData = useMemo(() => {
+    const sprite = decodeSpriteRGBA();
+    const region = decodeRegionMap();
+    return { sprite, region };
   }, []);
+
+  // Load refs from decoded data
+  useEffect(() => {
+    spriteRef.current = spriteData.sprite;
+    regionRef.current = spriteData.region;
+  }, [spriteData]);
+
+  // Generate preset thumbnails (runs once after sprite decode)
+  const presetThumbs = useMemo(
+    () => PRESETS.map((p) => renderPresetThumb(spriteData.sprite, spriteData.region, p.colors)),
+    [spriteData],
+  );
 
   // Fetch existing customization
   const { data: existing, isLoading } = useQuery({
@@ -147,7 +224,7 @@ export default function Customize() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customization", deviceId] });
-      toast.success("Cores salvas! O gatinho sera atualizado no proximo polling.");
+      toast.success("Cores salvas! O gatinho sera atualizado em ate 60 segundos.");
     },
     onError: () => toast.error("Erro ao salvar cores"),
   });
@@ -255,6 +332,10 @@ export default function Customize() {
     setOverrides((prev) => ({ ...(prev ?? colors), [name]: color }));
   }
 
+  function applyPreset(preset: CatPreset) {
+    setOverrides({ ...preset.colors });
+  }
+
   if (isLoading) {
     return <p className="text-gray-500 dark:text-slate-400">Carregando...</p>;
   }
@@ -338,6 +419,34 @@ export default function Customize() {
             </div>
           </div>
 
+          {/* Presets */}
+          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-6 shadow-sm dark:shadow-black/10">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Modelos</h2>
+            <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-7 gap-3">
+              {PRESETS.map((preset, i) => (
+                <button
+                  key={preset.name}
+                  onClick={() => applyPreset(preset)}
+                  className="group flex flex-col items-center gap-1 rounded-xl p-2 border border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800/50 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all hover:scale-105"
+                >
+                  {presetThumbs[i] ? (
+                    <img
+                      src={presetThumbs[i]}
+                      alt={preset.name}
+                      className="w-12 h-14 object-contain"
+                      style={{ imageRendering: "pixelated" }}
+                    />
+                  ) : (
+                    <div className="w-12 h-14 bg-gray-200 dark:bg-slate-700 rounded animate-pulse" />
+                  )}
+                  <span className="text-[10px] leading-tight text-gray-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    {preset.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="flex gap-3">
             <button
@@ -356,9 +465,13 @@ export default function Customize() {
             </button>
           </div>
 
-          <p className="text-xs text-gray-400 dark:text-slate-500">
-            As cores serao aplicadas no dispositivo no proximo ciclo de polling (~60s).
-          </p>
+          {/* Update notice */}
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+            <span className="text-amber-500 mt-0.5 text-sm">&#9432;</span>
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Apos salvar, as novas cores serao aplicadas automaticamente no dispositivo em ate 60 segundos, no proximo ciclo de sincronizacao.
+            </p>
+          </div>
         </div>
       </div>
     </div>
