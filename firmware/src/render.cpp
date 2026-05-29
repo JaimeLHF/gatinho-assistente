@@ -1211,8 +1211,10 @@ void renderFrame(AppState state) {
             desc.trim();
             if (desc.length() > 0) {
                 desc = stripAccents(desc);
+                if (desc.length() > 16) desc = desc.substring(0, 15) + "..";
                 fb.setTextColor(COL_TEXT, COL_BG);
-                descY = drawWrappedText(desc, TEXT_AREA_CX, descY, areaW, 2, 16);
+                fb.drawString(desc, TEXT_AREA_CX, descY, 2);
+                descY += 16;
             } else {
                 fb.setTextColor(COL_TEXT_DIM, COL_BG);
                 fb.drawString("- - -", TEXT_AREA_CX, descY, 2);
