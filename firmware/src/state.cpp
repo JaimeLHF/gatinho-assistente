@@ -8,6 +8,7 @@
 
 static AppState    currentState = STATE_CONNECTING;
 static EventData   currentEvent = { "", "", "", 5, false };
+static CatColors   currentColors = { "", "", "", "", "", "", false };
 static unsigned long lastPollMs = 0;
 static bool        firstPoll   = true;
 static String      dismissedStartsAt = "";
@@ -66,8 +67,8 @@ void stateUpdate() {
         firstPoll = false;
         lastPollMs = now;
 
-        String eventJson, serverTime;
-        if (networkPoll(eventJson, serverTime)) {
+        String eventJson, serverTime, colorsJson;
+        if (networkPoll(eventJson, serverTime, colorsJson)) {
             if (currentState == STATE_API_ERROR) {
                 Serial.println("[state] API recovered");
                 currentState = STATE_IDLE;
@@ -75,6 +76,7 @@ void stateUpdate() {
             }
             stateSyncTime(serverTime);
             stateSetEvent(eventJson);
+            stateSetColors(colorsJson);
         } else {
             currentState = STATE_API_ERROR;
             return;
@@ -166,6 +168,33 @@ void stateDismissAlert() {
 void stateForcePortal() {
     currentState = STATE_PORTAL;
     Serial.println("[state] Entrando em STATE_PORTAL");
+}
+
+void stateSetColors(const String& colorsJson) {
+    if (colorsJson.isEmpty()) {
+        currentColors.valid = false;
+        return;
+    }
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, colorsJson);
+    if (err) {
+        currentColors.valid = false;
+        return;
+    }
+
+    currentColors.body    = doc["body"].as<String>();
+    currentColors.stripes = doc["stripes"].as<String>();
+    currentColors.belly   = doc["belly"].as<String>();
+    currentColors.outline = doc["outline"].as<String>();
+    currentColors.eyes    = doc["eyes"].as<String>();
+    currentColors.nose    = doc["nose"].as<String>();
+    currentColors.valid   = true;
+    Serial.println("[state] custom colors loaded");
+}
+
+CatColors stateGetColors() {
+    return currentColors;
 }
 
 int stateMinutesUntilEvent() {

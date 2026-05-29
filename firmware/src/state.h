@@ -19,6 +19,17 @@ struct EventData {
     bool   valid;
 };
 
+// Custom colors for the cat (hex strings from API, e.g. "#FF0000")
+struct CatColors {
+    String body;
+    String stripes;
+    String belly;
+    String outline;
+    String eyes;
+    String nose;
+    bool   valid;
+};
+
 void  stateSetup();
 void  stateUpdate();
 
@@ -45,3 +56,9 @@ void stateDismissAlert();
 
 // Force portal state (called when WiFi setup is needed)
 void stateForcePortal();
+
+// Set custom cat colors from JSON (called by network poll)
+void stateSetColors(const String& colorsJson);
+
+// Get current custom colors
+CatColors stateGetColors();

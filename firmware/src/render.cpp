@@ -267,6 +267,192 @@ static void drawClockIcon(int cx, int cy, int r, uint16_t col) {
     fb.drawLine(cx, cy, cx + r - 2, cy, col);        // 3 o'clock hand
 }
 
+// ---- Color remapping for customization ----
+
+// Reference colors per region (RGB565) — must match web/src/data/catSprite.ts
+static const uint16_t REGION_REF[6] = {
+    0x0000,  // 0: outline (black)
+    0x5981,  // 1: stripes (dark brown)
+    0xD2C7,  // 2: body (orange-red)
+    0xF56C,  // 3: belly (light orange)
+    0xFFFF,  // 4: eyes (white)
+    0xEED4,  // 5: nose (cream)
+};
+static const int NUM_REGIONS = 6;
+
+// Color lookup table: maps original RGB565 → remapped RGB565
+// Using a simple hash map (open addressing, 256 entries — fits ~132 unique colors)
+static const int CLT_SIZE = 256;
+static uint16_t cltKeys[CLT_SIZE];
+static uint16_t cltVals[CLT_SIZE];
+static bool     cltUsed[CLT_SIZE];  // track occupied slots (avoids 0xFFFF collision with white)
+static bool     cltActive = false;
+static String   cltFingerprint = "";  // detect changes
+
+// RGB565 ↔ RGB888 conversions
+static void rgb565ToRgb(uint16_t c, uint8_t& r, uint8_t& g, uint8_t& b) {
+    r = ((c >> 11) & 0x1F) * 255 / 31;
+    g = ((c >> 5) & 0x3F) * 255 / 63;
+    b = (c & 0x1F) * 255 / 31;
+}
+
+static uint16_t rgbToRgb565(uint8_t r, uint8_t g, uint8_t b) {
+    return ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+}
+
+// RGB → HSL (0-1 range)
+static void rgbToHsl(uint8_t ri, uint8_t gi, uint8_t bi, float& h, float& s, float& l) {
+    float r = ri / 255.0f, g = gi / 255.0f, b = bi / 255.0f;
+    float mx = max(max(r, g), b), mn = min(min(r, g), b);
+    l = (mx + mn) / 2.0f;
+    if (mx == mn) { h = s = 0; return; }
+    float d = mx - mn;
+    s = l > 0.5f ? d / (2.0f - mx - mn) : d / (mx + mn);
+    if (mx == r) h = (g - b) / d + (g < b ? 6.0f : 0);
+    else if (mx == g) h = (b - r) / d + 2.0f;
+    else h = (r - g) / d + 4.0f;
+    h /= 6.0f;
+}
+
+static float hue2rgb(float p, float q, float t) {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1.0f/6) return p + (q - p) * 6 * t;
+    if (t < 0.5f) return q;
+    if (t < 2.0f/3) return p + (q - p) * (2.0f/3 - t) * 6;
+    return p;
+}
+
+static void hslToRgb(float h, float s, float l, uint8_t& r, uint8_t& g, uint8_t& b) {
+    if (s == 0) { r = g = b = (uint8_t)(l * 255); return; }
+    float q = l < 0.5f ? l * (1 + s) : l + s - l * s;
+    float p = 2 * l - q;
+    r = (uint8_t)(hue2rgb(p, q, h + 1.0f/3) * 255);
+    g = (uint8_t)(hue2rgb(p, q, h) * 255);
+    b = (uint8_t)(hue2rgb(p, q, h - 1.0f/3) * 255);
+}
+
+// Parse "#RRGGBB" hex string to RGB
+static bool parseHex(const String& hex, uint8_t& r, uint8_t& g, uint8_t& b) {
+    if (hex.length() != 7 || hex[0] != '#') return false;
+    long val = strtol(hex.c_str() + 1, nullptr, 16);
+    r = (val >> 16) & 0xFF;
+    g = (val >> 8) & 0xFF;
+    b = val & 0xFF;
+    return true;
+}
+
+// Classify an RGB565 pixel into a region by nearest reference color
+static int classifyPixel(uint16_t p) {
+    uint8_t pr, pg, pb;
+    rgb565ToRgb(p, pr, pg, pb);
+    int best = 0;
+    int bestDist = 999999;
+    for (int i = 0; i < NUM_REGIONS; i++) {
+        uint8_t rr, rg, rb;
+        rgb565ToRgb(REGION_REF[i], rr, rg, rb);
+        int dr = (int)pr - rr, dg = (int)pg - rg, db = (int)pb - rb;
+        int dist = dr*dr + dg*dg + db*db;
+        if (dist < bestDist) { bestDist = dist; best = i; }
+    }
+    return best;
+}
+
+// Build color lookup table from custom colors
+static void buildColorLUT(const CatColors& cc) {
+    // Compute fingerprint to avoid rebuilding every frame
+    String fp = cc.body + cc.stripes + cc.belly + cc.outline + cc.eyes + cc.nose;
+    if (fp == cltFingerprint && cltActive) return;
+    cltFingerprint = fp;
+
+    // Parse target colors per region
+    uint8_t targetR[NUM_REGIONS], targetG[NUM_REGIONS], targetB[NUM_REGIONS];
+    float   targetH[NUM_REGIONS], targetS[NUM_REGIONS], targetL[NUM_REGIONS];
+    const String* hexStrs[NUM_REGIONS] = { &cc.outline, &cc.stripes, &cc.body, &cc.belly, &cc.eyes, &cc.nose };
+
+    for (int i = 0; i < NUM_REGIONS; i++) {
+        parseHex(*hexStrs[i], targetR[i], targetG[i], targetB[i]);
+        rgbToHsl(targetR[i], targetG[i], targetB[i], targetH[i], targetS[i], targetL[i]);
+    }
+
+    // Reference HSL per region
+    float refH[NUM_REGIONS], refS[NUM_REGIONS], refL[NUM_REGIONS];
+    for (int i = 0; i < NUM_REGIONS; i++) {
+        uint8_t rr, rg, rb;
+        rgb565ToRgb(REGION_REF[i], rr, rg, rb);
+        rgbToHsl(rr, rg, rb, refH[i], refS[i], refL[i]);
+    }
+
+    // Delta per region
+    float dh[NUM_REGIONS], ds[NUM_REGIONS], dl[NUM_REGIONS];
+    for (int i = 0; i < NUM_REGIONS; i++) {
+        dh[i] = targetH[i] - refH[i];
+        ds[i] = targetS[i] - refS[i];
+        dl[i] = targetL[i] - refL[i];
+    }
+
+    // Clear LUT
+    memset(cltUsed, 0, sizeof(cltUsed));
+
+    // Scan all frames for unique colors and build LUT
+    for (int f = 0; f < CAT_FRAME_COUNT; f++) {
+        for (int i = 0; i < CAT_FRAME_W * CAT_FRAME_H; i++) {
+            uint16_t p = pgm_read_word(&cat_frames[f][i]);
+            if (p == CAT_TRANSPARENT) continue;
+
+            // Check if already in LUT
+            uint16_t slot = p & (CLT_SIZE - 1);
+            bool found = false;
+            for (int j = 0; j < CLT_SIZE; j++) {
+                uint16_t idx = (slot + j) & (CLT_SIZE - 1);
+                if (cltUsed[idx] && cltKeys[idx] == p) { found = true; break; }
+                if (!cltUsed[idx]) break;
+            }
+            if (found) continue;
+
+            // Classify and remap
+            int region = classifyPixel(p);
+            uint8_t pr, pg, pb;
+            rgb565ToRgb(p, pr, pg, pb);
+            float ph, ps, pl;
+            rgbToHsl(pr, pg, pb, ph, ps, pl);
+
+            float nh = fmodf(ph + dh[region] + 1.0f, 1.0f);
+            float ns = constrain(ps + ds[region], 0.0f, 1.0f);
+            float nl = constrain(pl + dl[region], 0.0f, 1.0f);
+
+            uint8_t nr, ng, nb;
+            hslToRgb(nh, ns, nl, nr, ng, nb);
+            uint16_t remapped = rgbToRgb565(nr, ng, nb);
+
+            // Insert into LUT
+            for (int j = 0; j < CLT_SIZE; j++) {
+                uint16_t idx = (slot + j) & (CLT_SIZE - 1);
+                if (!cltUsed[idx]) {
+                    cltKeys[idx] = p;
+                    cltVals[idx] = remapped;
+                    cltUsed[idx] = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    cltActive = true;
+    Serial.println("[render] color LUT built");
+}
+
+// Look up a remapped color (returns original if not found or LUT not active)
+static inline uint16_t remapColor(uint16_t p) {
+    if (!cltActive) return p;
+    uint16_t slot = p & (CLT_SIZE - 1);
+    for (int j = 0; j < 8; j++) {  // max 8 probes
+        uint16_t idx = (slot + j) & (CLT_SIZE - 1);
+        if (!cltUsed[idx]) return p;
+        if (cltKeys[idx] == p) return cltVals[idx];
+    }
+    return p;
+}
+
 static void drawCatFrame(int ox, int oy, int frameIdx, bool flip = false) {
     for (int dy = 0; dy < CAT_DRAW_H; dy++) {
         int sy = dy * CAT_FRAME_H / CAT_DRAW_H;
@@ -275,7 +461,7 @@ static void drawCatFrame(int ox, int oy, int frameIdx, bool flip = false) {
             uint16_t p = pgm_read_word(&cat_frames[frameIdx][sy * CAT_FRAME_W + sx]);
             if (p == CAT_TRANSPARENT) continue;
             int px = flip ? (CAT_DRAW_W - 1 - dx) : dx;
-            fb.drawPixel(ox + px, oy + dy, p);
+            fb.drawPixel(ox + px, oy + dy, remapColor(p));
         }
     }
 }
@@ -815,6 +1001,15 @@ void renderFrame(AppState state) {
         drawResetOverlay();
         fb.pushSprite(0, 0);
         return;
+    }
+
+    // Update color LUT if custom colors are set
+    CatColors cc = stateGetColors();
+    if (cc.valid) {
+        buildColorLUT(cc);
+    } else if (cltActive) {
+        cltActive = false;
+        cltFingerprint = "";
     }
 
     // IDLE or ALERT

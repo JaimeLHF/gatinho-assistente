@@ -49,7 +49,7 @@ bool networkIsConnected() {
     return WiFi.status() == WL_CONNECTED;
 }
 
-bool networkPoll(String& eventJson, String& serverTime) {
+bool networkPoll(String& eventJson, String& serverTime, String& colorsJson) {
     if (!networkIsConnected()) return false;
 
     HTTPClient http;
@@ -85,6 +85,16 @@ bool networkPoll(String& eventJson, String& serverTime) {
         eventJson = "";
     }
 
-    Serial.printf("[poll] ok, event=%s\n", eventJson.isEmpty() ? "none" : "yes");
+    if (doc["customization"].is<JsonObject>()) {
+        String buf;
+        serializeJson(doc["customization"], buf);
+        colorsJson = buf;
+    } else {
+        colorsJson = "";
+    }
+
+    Serial.printf("[poll] ok, event=%s, colors=%s\n",
+                  eventJson.isEmpty() ? "none" : "yes",
+                  colorsJson.isEmpty() ? "default" : "custom");
     return true;
 }
