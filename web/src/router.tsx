@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Events from "./pages/Events";
 import Devices from "./pages/Devices";
 import Profile from "./pages/Profile";
+import Customize from "./pages/Customize";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
           { index: true, Component: Dashboard },
           { path: "events", Component: Events },
           { path: "devices", Component: Devices },
+          { path: "devices/:deviceId/customize", Component: Customize },
           { path: "profile", Component: Profile },
           { path: "*", Component: NotFound },
         ],

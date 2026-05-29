@@ -35,6 +35,17 @@ export interface DeviceWithToken extends Device {
   token: string;
 }
 
+export interface CatCustomization {
+  id?: string;
+  deviceId?: string;
+  body: string;
+  stripes: string;
+  belly: string;
+  outline: string;
+  eyes: string;
+  nose: string;
+}
+
 export interface ApiError {
   error: {
     code: string;

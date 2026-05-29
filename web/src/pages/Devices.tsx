@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as devicesApi from "../api/devices";
 import ConfirmModal from "../components/ConfirmModal";
@@ -27,6 +28,7 @@ function timeAgo(iso: string): string {
 }
 
 export default function Devices() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
   const [name, setName] = useState("");
@@ -238,6 +240,12 @@ export default function Devices() {
 
               {editing?.id !== device.id && (
                 <div className="ml-4 flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => navigate(`/devices/${device.id}/customize`)}
+                    className="rounded px-3 py-1 text-sm text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
+                  >
+                    Personalizar
+                  </button>
                   <button
                     onClick={() => startEdit(device)}
                     className="rounded px-3 py-1 text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
