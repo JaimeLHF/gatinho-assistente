@@ -21,10 +21,30 @@ export async function remove(req: Request, res: Response) {
   res.status(204).send();
 }
 
+export async function getCustomization(req: Request, res: Response) {
+  const customization = await deviceService.getCustomization(req.user!.id, req.params.id as string);
+  res.json(customization);
+}
+
+export async function upsertCustomization(req: Request, res: Response) {
+  const customization = await deviceService.upsertCustomization(
+    req.user!.id,
+    req.params.id as string,
+    req.body,
+  );
+  res.json(customization);
+}
+
+export async function deleteCustomization(req: Request, res: Response) {
+  await deviceService.deleteCustomization(req.user!.id, req.params.id as string);
+  res.status(204).send();
+}
+
 export async function nextEvent(req: Request, res: Response) {
-  const event = await deviceService.nextEvent(req.device!.userId);
+  const { event, customization } = await deviceService.nextEvent(req.device!.id, req.device!.userId);
   res.json({
     event: event ?? null,
+    customization: customization ?? null,
     currentTime: new Date().toISOString(),
   });
 }

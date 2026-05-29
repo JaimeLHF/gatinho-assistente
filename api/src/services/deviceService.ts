@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { ApiError } from "../middlewares/errorHandler.js";
-import type { CreateDeviceInput, UpdateDeviceInput } from "../schemas/device.js";
+import type { CreateDeviceInput, UpdateDeviceInput, CustomizationInput } from "../schemas/device.js";
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -80,15 +80,57 @@ export async function findByToken(plainToken: string) {
   return device;
 }
 
-export async function nextEvent(userId: string) {
+export async function getCustomization(userId: string, deviceId: string) {
+  const device = await prisma.device.findUnique({ where: { id: deviceId } });
+
+  if (!device || device.userId !== userId) {
+    throw new ApiError(404, "DEVICE_NOT_FOUND", "Device not found");
+  }
+
+  return prisma.deviceCustomization.findUnique({ where: { deviceId } });
+}
+
+export async function upsertCustomization(userId: string, deviceId: string, data: CustomizationInput) {
+  const device = await prisma.device.findUnique({ where: { id: deviceId } });
+
+  if (!device || device.userId !== userId) {
+    throw new ApiError(404, "DEVICE_NOT_FOUND", "Device not found");
+  }
+
+  return prisma.deviceCustomization.upsert({
+    where: { deviceId },
+    create: { deviceId, ...data },
+    update: data,
+  });
+}
+
+export async function deleteCustomization(userId: string, deviceId: string) {
+  const device = await prisma.device.findUnique({ where: { id: deviceId } });
+
+  if (!device || device.userId !== userId) {
+    throw new ApiError(404, "DEVICE_NOT_FOUND", "Device not found");
+  }
+
+  await prisma.deviceCustomization.deleteMany({ where: { deviceId } });
+}
+
+export async function nextEvent(deviceId: string, userId: string) {
   const now = new Date();
 
-  return prisma.event.findFirst({
-    where: {
-      userId,
-      status: "PENDING",
-      startsAt: { gte: now },
-    },
-    orderBy: { startsAt: "asc" },
-  });
+  const [event, customization] = await Promise.all([
+    prisma.event.findFirst({
+      where: {
+        userId,
+        status: "PENDING",
+        startsAt: { gte: now },
+      },
+      orderBy: { startsAt: "asc" },
+    }),
+    prisma.deviceCustomization.findUnique({
+      where: { deviceId },
+      select: { body: true, stripes: true, belly: true, outline: true, eyes: true, nose: true },
+    }),
+  ]);
+
+  return { event, customization };
 }

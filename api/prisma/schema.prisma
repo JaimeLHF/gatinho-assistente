@@ -21,16 +21,31 @@ model User {
 }
 
 model Device {
-  id         String    @id @default(cuid())
-  userId     String
-  name       String
-  tokenHash  String    @unique
-  lastSeenAt DateTime?
-  createdAt  DateTime  @default(now())
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String               @id @default(cuid())
+  userId        String
+  name          String
+  tokenHash     String               @unique
+  lastSeenAt    DateTime?
+  createdAt     DateTime             @default(now())
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customization DeviceCustomization?
 
   @@index([userId])
   @@map("devices")
+}
+
+model DeviceCustomization {
+  id       String @id @default(cuid())
+  deviceId String @unique
+  body     String @default("#D4A574")
+  stripes  String @default("#8B5E3C")
+  belly    String @default("#F5D4A0")
+  outline  String @default("#000000")
+  eyes     String @default("#FFFFFF")
+  nose     String @default("#FF9B9B")
+  device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@map("device_customizations")
 }
 
 model Event {

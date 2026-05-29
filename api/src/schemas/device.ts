@@ -12,5 +12,17 @@ export const updateDeviceSchema = z.object({
   name: z.string().min(1).max(100),
 });
 
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+export const customizationSchema = z.object({
+  body: hexColor,
+  stripes: hexColor,
+  belly: hexColor,
+  outline: hexColor,
+  eyes: hexColor,
+  nose: hexColor,
+});
+
 export type CreateDeviceInput = z.infer<typeof createDeviceSchema>;
 export type UpdateDeviceInput = z.infer<typeof updateDeviceSchema>;
+export type CustomizationInput = z.infer<typeof customizationSchema>;
