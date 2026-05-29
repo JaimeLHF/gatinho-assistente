@@ -71,21 +71,35 @@ export default function Profile() {
   return (
     <div className="max-w-lg space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Perfil</h1>
-        <p className="mt-1 text-sm text-gray-500">Gerencie suas informacoes pessoais.</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Perfil</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+          Gerencie suas informacoes pessoais.
+        </p>
       </div>
 
       {/* Profile form */}
-      <form onSubmit={handleProfile} className="rounded-lg bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">Dados pessoais</h2>
+      <form
+        onSubmit={handleProfile}
+        className="rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-sm dark:shadow-black/10 border border-gray-100 dark:border-slate-800 space-y-4"
+      >
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Dados pessoais</h2>
 
         {profileMsg && (
-          <p className="rounded bg-green-50 p-2 text-sm text-green-700">{profileMsg}</p>
+          <p className="rounded-lg bg-green-50 dark:bg-green-900/30 p-3 text-sm text-green-600 dark:text-green-400">
+            {profileMsg}
+          </p>
         )}
-        {profileErr && <p className="rounded bg-red-50 p-2 text-sm text-red-600">{profileErr}</p>}
+        {profileErr && (
+          <p className="rounded-lg bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-600 dark:text-red-400">
+            {profileErr}
+          </p>
+        )}
 
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="name"
+            className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+          >
             Nome
           </label>
           <input
@@ -93,12 +107,15 @@ export default function Profile() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-colors"
           />
         </div>
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+          >
             Email
           </label>
           <input
@@ -107,28 +124,42 @@ export default function Profile() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-colors"
           />
         </div>
 
         <button
           type="submit"
           disabled={saving}
-          className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          className="rounded-lg bg-indigo-600 dark:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 transition-colors"
         >
           {saving ? "Salvando..." : "Salvar"}
         </button>
       </form>
 
       {/* Password form */}
-      <form onSubmit={handlePassword} className="rounded-lg bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">Alterar senha</h2>
+      <form
+        onSubmit={handlePassword}
+        className="rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-sm dark:shadow-black/10 border border-gray-100 dark:border-slate-800 space-y-4"
+      >
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Alterar senha</h2>
 
-        {pwdMsg && <p className="rounded bg-green-50 p-2 text-sm text-green-700">{pwdMsg}</p>}
-        {pwdErr && <p className="rounded bg-red-50 p-2 text-sm text-red-600">{pwdErr}</p>}
+        {pwdMsg && (
+          <p className="rounded-lg bg-green-50 dark:bg-green-900/30 p-3 text-sm text-green-600 dark:text-green-400">
+            {pwdMsg}
+          </p>
+        )}
+        {pwdErr && (
+          <p className="rounded-lg bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-600 dark:text-red-400">
+            {pwdErr}
+          </p>
+        )}
 
         <div>
-          <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="currentPassword"
+            className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+          >
             Senha atual
           </label>
           <input
@@ -137,12 +168,15 @@ export default function Profile() {
             required
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-colors"
           />
         </div>
 
         <div>
-          <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="newPassword"
+            className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+          >
             Nova senha
           </label>
           <input
@@ -152,12 +186,15 @@ export default function Profile() {
             minLength={8}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-colors"
           />
         </div>
 
         <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="confirmPassword"
+            className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+          >
             Confirmar nova senha
           </label>
           <input
@@ -167,14 +204,14 @@ export default function Profile() {
             minLength={8}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-colors"
           />
         </div>
 
         <button
           type="submit"
           disabled={changingPwd}
-          className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          className="rounded-lg bg-indigo-600 dark:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 transition-colors"
         >
           {changingPwd ? "Alterando..." : "Alterar senha"}
         </button>

@@ -102,17 +102,17 @@ export default function Devices() {
   }
 
   if (isLoading) {
-    return <p className="text-gray-500">Carregando dispositivos...</p>;
+    return <p className="text-gray-500 dark:text-slate-400">Carregando dispositivos...</p>;
   }
 
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Dispositivos</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dispositivos</h1>
         {!showForm && !createdToken && (
           <button
             onClick={() => setShowForm(true)}
-            className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            className="rounded-lg bg-indigo-600 dark:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
           >
             Novo dispositivo
           </button>
@@ -120,24 +120,24 @@ export default function Devices() {
       </div>
 
       {createdToken && (
-        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
-          <p className="text-sm font-medium text-amber-800">
+        <div className="mt-4 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4">
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
             Token criado com sucesso. Copie agora — ele nao sera exibido novamente.
           </p>
           <div className="mt-2 flex items-center gap-2">
-            <code className="block flex-1 overflow-x-auto rounded bg-white px-3 py-2 font-mono text-xs text-gray-900 select-all">
+            <code className="block flex-1 overflow-x-auto rounded bg-white dark:bg-slate-800 px-3 py-2 font-mono text-xs text-gray-900 dark:text-white select-all">
               {createdToken}
             </code>
             <button
               onClick={handleCopy}
-              className="shrink-0 rounded bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700"
+              className="shrink-0 rounded bg-amber-600 dark:bg-amber-500 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700 dark:hover:bg-amber-600 transition-colors"
             >
               {copied ? "Copiado!" : "Copiar"}
             </button>
           </div>
           <button
             onClick={() => setCreatedToken(null)}
-            className="mt-3 text-sm text-amber-700 hover:underline"
+            className="mt-3 text-sm text-amber-700 dark:text-amber-300 hover:underline"
           >
             Fechar
           </button>
@@ -147,7 +147,10 @@ export default function Devices() {
       {showForm && (
         <form onSubmit={handleCreate} className="mt-4 flex max-w-md items-end gap-2">
           <div className="flex-1">
-            <label htmlFor="deviceName" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="deviceName"
+              className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+            >
               Nome do dispositivo
             </label>
             <input
@@ -156,20 +159,20 @@ export default function Devices() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: Sala de estar"
-              className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+              className="mt-1 block w-full rounded border border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
             />
           </div>
           <button
             type="submit"
             disabled={createMutation.isPending}
-            className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="rounded-lg bg-indigo-600 dark:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 transition-colors"
           >
             {createMutation.isPending ? "Criando..." : "Criar"}
           </button>
           <button
             type="button"
             onClick={() => setShowForm(false)}
-            className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="rounded border border-gray-300 dark:border-slate-600 px-4 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
           >
             Cancelar
           </button>
@@ -177,13 +180,15 @@ export default function Devices() {
       )}
 
       {devices.length === 0 && !showForm ? (
-        <p className="mt-6 text-center text-gray-500">Nenhum dispositivo cadastrado.</p>
+        <p className="mt-6 text-center text-gray-500 dark:text-slate-400">
+          Nenhum dispositivo cadastrado.
+        </p>
       ) : (
         <div className="mt-4 space-y-3">
           {devices.map((device) => (
             <div
               key={device.id}
-              className="flex items-center justify-between rounded-lg bg-white p-4 shadow-sm"
+              className="flex items-center justify-between rounded-xl bg-white dark:bg-slate-900 p-4 shadow-sm dark:shadow-black/10 border border-gray-100 dark:border-slate-800"
             >
               <div className="min-w-0 flex-1">
                 {editing?.id === device.id ? (
@@ -193,27 +198,27 @@ export default function Devices() {
                       required
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                      className="w-full rounded border border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white px-2 py-1 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
                     />
                     <button
                       type="submit"
                       disabled={updateMutation.isPending}
-                      className="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                      className="rounded-lg bg-indigo-600 dark:bg-indigo-500 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 transition-colors"
                     >
                       Salvar
                     </button>
                     <button
                       type="button"
                       onClick={() => setEditing(null)}
-                      className="rounded border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                      className="rounded border border-gray-300 dark:border-slate-600 px-3 py-1 text-xs text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
                     >
                       Cancelar
                     </button>
                   </form>
                 ) : (
                   <>
-                    <h3 className="font-medium text-gray-900">{device.name}</h3>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <h3 className="font-medium text-gray-900 dark:text-white">{device.name}</h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
                       Criado em {formatDate(device.createdAt)}
                       {device.lastSeenAt && (
                         <span className="ml-2 inline-flex items-center gap-1">
@@ -222,7 +227,9 @@ export default function Devices() {
                         </span>
                       )}
                       {!device.lastSeenAt && (
-                        <span className="ml-2 text-gray-400">· Nunca conectou</span>
+                        <span className="ml-2 text-gray-400 dark:text-slate-500">
+                          · Nunca conectou
+                        </span>
                       )}
                     </p>
                   </>
@@ -233,13 +240,13 @@ export default function Devices() {
                 <div className="ml-4 flex shrink-0 items-center gap-1">
                   <button
                     onClick={() => startEdit(device)}
-                    className="rounded px-3 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
+                    className="rounded px-3 py-1 text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
                   >
                     Editar
                   </button>
                   <button
                     onClick={() => setRevokeTarget(device)}
-                    className="rounded px-3 py-1 text-sm text-red-600 hover:bg-red-50"
+                    className="rounded px-3 py-1 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
                   >
                     Revogar
                   </button>

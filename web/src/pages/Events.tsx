@@ -13,9 +13,9 @@ const STATUS_LABEL: Record<Event["status"], string> = {
 };
 
 const STATUS_COLOR: Record<Event["status"], string> = {
-  PENDING: "bg-yellow-100 text-yellow-800",
-  DONE: "bg-green-100 text-green-800",
-  DISMISSED: "bg-gray-100 text-gray-600",
+  PENDING: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+  DONE: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  DISMISSED: "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-400",
 };
 
 function formatDate(iso: string): string {
@@ -99,16 +99,16 @@ export default function Events() {
   });
 
   if (isLoading) {
-    return <p className="text-gray-500">Carregando eventos...</p>;
+    return <p className="text-gray-500 dark:text-slate-400">Carregando eventos...</p>;
   }
 
   if (showForm || editing) {
     return (
       <div>
-        <h1 className="mb-4 text-2xl font-bold text-gray-900">
+        <h1 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">
           {editing ? "Editar evento" : "Novo evento"}
         </h1>
-        <div className="max-w-lg rounded-lg bg-white p-6 shadow">
+        <div className="max-w-lg rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl dark:shadow-black/20 border border-gray-100 dark:border-slate-800">
           <EventForm
             initial={editing ?? undefined}
             submitLabel={editing ? "Salvar" : "Criar"}
@@ -132,10 +132,10 @@ export default function Events() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Eventos</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Eventos</h1>
         <button
           onClick={() => setShowForm(true)}
-          className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          className="rounded-lg bg-indigo-600 dark:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
         >
           Novo evento
         </button>
@@ -144,21 +144,21 @@ export default function Events() {
       {/* Filters */}
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-500">De</label>
+          <label className="block text-xs font-medium text-gray-500 dark:text-slate-400">De</label>
           <input
             type="date"
             value={filterFrom}
             onChange={(e) => setFilterFrom(e.target.value)}
-            className="mt-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+            className="mt-1 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20 focus:outline-none"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500">Ate</label>
+          <label className="block text-xs font-medium text-gray-500 dark:text-slate-400">Ate</label>
           <input
             type="date"
             value={filterTo}
             onChange={(e) => setFilterTo(e.target.value)}
-            className="mt-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+            className="mt-1 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20 focus:outline-none"
           />
         </div>
         {(filterFrom || filterTo) && (
@@ -167,7 +167,7 @@ export default function Events() {
               setFilterFrom("");
               setFilterTo("");
             }}
-            className="text-xs text-indigo-600 hover:underline"
+            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
           >
             Limpar filtros
           </button>
@@ -175,51 +175,57 @@ export default function Events() {
       </div>
 
       {events.length === 0 ? (
-        <p className="mt-6 text-center text-gray-500">Nenhum evento encontrado.</p>
+        <p className="mt-6 text-center text-gray-500 dark:text-slate-400">
+          Nenhum evento encontrado.
+        </p>
       ) : (
         <div className="mt-4 space-y-3">
           {events.map((event) => (
             <div
               key={event.id}
-              className="flex items-center justify-between rounded-lg bg-white p-4 shadow-sm"
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-white dark:bg-slate-900 p-4 shadow-sm dark:shadow-black/10 border border-gray-100 dark:border-slate-800"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="truncate font-medium text-gray-900">{event.title}</h3>
+                  <h3 className="truncate font-medium text-gray-900 dark:text-white">
+                    {event.title}
+                  </h3>
                   <span
                     className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[event.status]}`}
                   >
                     {STATUS_LABEL[event.status]}
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
                   {formatDate(event.startsAt)}
                   {event.durationMin != null && ` · ${event.durationMin} min`}
                   {` · alerta ${event.alertMinutesBefore} min antes`}
                 </p>
                 {event.description && (
-                  <p className="mt-1 truncate text-sm text-gray-400">{event.description}</p>
+                  <p className="mt-1 truncate text-sm text-gray-400 dark:text-slate-500">
+                    {event.description}
+                  </p>
                 )}
               </div>
 
-              <div className="ml-4 flex shrink-0 items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1 sm:ml-4">
                 {event.status === "PENDING" && (
                   <button
                     onClick={() => statusMutation.mutate({ id: event.id, status: "DONE" })}
-                    className="rounded px-2 py-1 text-xs text-green-700 hover:bg-green-50"
+                    className="rounded px-2 py-1 text-xs text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
                   >
                     Concluir
                   </button>
                 )}
                 <button
                   onClick={() => setEditing(event)}
-                  className="rounded px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50"
+                  className="rounded px-2 py-1 text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
                 >
                   Editar
                 </button>
                 <button
                   onClick={() => setDeleteTarget(event)}
-                  className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                  className="rounded px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
                 >
                   Excluir
                 </button>

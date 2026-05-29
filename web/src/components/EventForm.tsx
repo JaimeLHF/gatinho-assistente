@@ -49,10 +49,17 @@ export default function EventForm({ initial, onSubmit, onCancel, submitLabel }: 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <p className="rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="rounded-lg bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-600 dark:text-red-400">
+          {error}
+        </p>
+      )}
 
       <div>
-        <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+        <label
+          htmlFor="title"
+          className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+        >
           Titulo
         </label>
         <input
@@ -61,12 +68,15 @@ export default function EventForm({ initial, onSubmit, onCancel, submitLabel }: 
           maxLength={200}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+          className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-colors"
         />
       </div>
 
       <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+        <label
+          htmlFor="description"
+          className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+        >
           Descricao
         </label>
         <textarea
@@ -75,12 +85,15 @@ export default function EventForm({ initial, onSubmit, onCancel, submitLabel }: 
           maxLength={2000}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+          className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-colors"
         />
       </div>
 
       <div>
-        <label htmlFor="startsAt" className="block text-sm font-medium text-gray-700">
+        <label
+          htmlFor="startsAt"
+          className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+        >
           Data/Hora
         </label>
         <input
@@ -89,13 +102,16 @@ export default function EventForm({ initial, onSubmit, onCancel, submitLabel }: 
           required
           value={startsAt}
           onChange={(e) => setStartsAt(e.target.value)}
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+          className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-colors"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="durationMin" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="durationMin"
+            className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+          >
             Duracao (min)
           </label>
           <input
@@ -105,11 +121,14 @@ export default function EventForm({ initial, onSubmit, onCancel, submitLabel }: 
             max="10080"
             value={durationMin}
             onChange={(e) => setDurationMin(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-colors"
           />
         </div>
         <div>
-          <label htmlFor="alertMinutesBefore" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="alertMinutesBefore"
+            className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+          >
             Alerta antes (min)
           </label>
           <input
@@ -119,7 +138,7 @@ export default function EventForm({ initial, onSubmit, onCancel, submitLabel }: 
             max="1440"
             value={alertMinutesBefore}
             onChange={(e) => setAlertMinutesBefore(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-colors"
           />
         </div>
       </div>
@@ -128,14 +147,14 @@ export default function EventForm({ initial, onSubmit, onCancel, submitLabel }: 
         <button
           type="button"
           onClick={onCancel}
-          className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          className="rounded-lg border border-gray-300 dark:border-slate-600 px-4 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={submitting}
-          className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          className="rounded-lg bg-indigo-600 dark:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 transition-colors"
         >
           {submitting ? "Salvando..." : submitLabel}
         </button>
