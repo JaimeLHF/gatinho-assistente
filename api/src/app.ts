@@ -9,6 +9,7 @@ import meRouter from "./routes/me.js";
 import eventsRouter from "./routes/events.js";
 import devicesRouter from "./routes/devices.js";
 import deviceRouter from "./routes/device.js";
+import firmwareRouter from "./routes/firmware.js";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use("/api/v1", apiLimiter);
 app.use("/api/v1", meRouter);
 app.use("/api/v1", eventsRouter);
 app.use("/api/v1", devicesRouter);
+app.use("/api/v1", firmwareRouter);
 
 app.use(errorHandler);
 

@@ -8,6 +8,7 @@ import Events from "./pages/Events";
 import Devices from "./pages/Devices";
 import Profile from "./pages/Profile";
 import Customize from "./pages/Customize";
+import Firmware from "./pages/Firmware";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
           { path: "events", Component: Events },
           { path: "devices", Component: Devices },
           { path: "devices/:deviceId/customize", Component: Customize },
+          { path: "firmware", Component: Firmware },
           { path: "profile", Component: Profile },
           { path: "*", Component: NotFound },
         ],

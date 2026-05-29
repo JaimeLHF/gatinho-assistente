@@ -15,6 +15,9 @@
 // Polling interval in milliseconds
 #define POLL_INTERVAL_MS 60000
 
+// Firmware version (used for OTA auto-update check)
+#define FIRMWARE_VERSION "1.0.0"
+
 // Coordinates for weather (Open-Meteo API)
 #define WEATHER_LAT  -23.5505  // São Paulo
 #define WEATHER_LON  -46.6340

@@ -10,6 +10,7 @@
 #include "button_reset.h"
 #include "weather.h"
 #include "ota.h"
+#include "auto_update.h"
 
 static bool ntpStarted = false;
 static bool otaStarted = false;
@@ -66,6 +67,7 @@ void loop() {
         }
 
         weatherUpdate();
+        autoUpdateCheck();
         otaLoop();
     }
 

@@ -16,6 +16,7 @@ model User {
   devices       Device[]
   events        Event[]
   refreshTokens RefreshToken[]
+  firmwares     Firmware[]
 
   @@map("users")
 }
@@ -79,6 +80,19 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model Firmware {
+  id        String   @id @default(cuid())
+  version   String   @unique
+  filename  String
+  size      Int
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@map("firmwares")
 }
 
 enum EventStatus {

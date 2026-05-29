@@ -50,6 +50,13 @@ export interface CatCustomization {
   bgColor: string;
 }
 
+export interface FirmwareInfo {
+  id: string;
+  version: string;
+  size: number;
+  createdAt: string;
+}
+
 export interface ApiError {
   error: {
     code: string;
