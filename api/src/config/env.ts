@@ -20,4 +20,15 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+const UNSAFE_DEFAULTS = ["change-me-access-secret", "change-me-refresh-secret"];
+
+if (
+  parsed.data.NODE_ENV === "production" &&
+  (UNSAFE_DEFAULTS.includes(parsed.data.JWT_ACCESS_SECRET) ||
+    UNSAFE_DEFAULTS.includes(parsed.data.JWT_REFRESH_SECRET))
+) {
+  console.error("❌ Cannot start in production with default JWT secrets. Set real values in .env.production");
+  process.exit(1);
+}
+
 export const env = parsed.data;

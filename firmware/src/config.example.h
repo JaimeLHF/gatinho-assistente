@@ -7,6 +7,8 @@
 #define WIFI_PASSWORD "your-wifi-password"
 
 // API base URL (no trailing slash)
+// Local dev:  "http://192.168.1.100:3001/api/v1"
+// Production: "https://yourdomain.com/api/v1"
 #define API_BASE_URL  "http://192.168.1.100:3001/api/v1"
 
 // Device token from POST /api/v1/devices

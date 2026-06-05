@@ -5,8 +5,22 @@
 #include "state.h"
 
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+
+static const bool USE_HTTPS = String(API_BASE_URL).startsWith("https");
+static WiFiClientSecure secureClient;
+static WiFiClient plainClient;
+
+static void httpBegin(HTTPClient& http, const String& url) {
+    if (USE_HTTPS) {
+        secureClient.setInsecure();
+        http.begin(secureClient, url);
+    } else {
+        http.begin(plainClient, url);
+    }
+}
 
 void networkSetup() {
     wifiConfigBegin();
@@ -54,7 +68,7 @@ bool networkPoll(String& eventJson, String& serverTime, String& colorsJson) {
 
     HTTPClient http;
     String url = String(API_BASE_URL) + "/device/next-event";
-    http.begin(url);
+    httpBegin(http, url);
     http.addHeader("X-Device-Token", DEVICE_TOKEN);
     http.setTimeout(10000);
 

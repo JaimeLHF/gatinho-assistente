@@ -23,5 +23,7 @@ RUN pnpm install --frozen-lockfile --filter api --prod
 COPY --from=build /app/api/dist api/dist
 COPY --from=build /app/api/src/generated api/src/generated
 COPY --from=build /app/api/prisma api/prisma
+COPY api/entrypoint.sh api/entrypoint.sh
+RUN chmod +x api/entrypoint.sh
 EXPOSE 3001
-CMD ["node", "api/dist/server.js"]
+ENTRYPOINT ["api/entrypoint.sh"]
