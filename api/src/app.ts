@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import { env } from "./config/env.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import { authLimiter, apiLimiter, devicePollLimiter } from "./middlewares/rateLimiter.js";
@@ -13,6 +14,12 @@ import firmwareRouter from "./routes/firmware.js";
 
 const app = express();
 
+// Trust proxy — needed for correct IP in rate limiting behind nginx
+if (env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
+app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json());
 

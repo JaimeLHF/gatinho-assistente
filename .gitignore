@@ -4,6 +4,7 @@ dist/
 build/
 .env
 .env.local
+.env.production
 *.log
 
 # PlatformIO
@@ -14,6 +15,9 @@ firmware/build/
 .vscode/
 .idea/
 *.swp
+
+# Backups
+backups/*.sql.gz
 
 # OS
 .DS_Store
