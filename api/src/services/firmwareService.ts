@@ -41,6 +41,12 @@ export async function list() {
   });
 }
 
+export async function getFilename(version: string): Promise<string> {
+  const fw = await prisma.firmware.findUnique({ where: { version } });
+  if (!fw) throw new ApiError(404, "FIRMWARE_NOT_FOUND", "Firmware not found");
+  return fw.filename;
+}
+
 export async function getFilePath(version: string): Promise<string> {
   const fw = await prisma.firmware.findUnique({ where: { version } });
   if (!fw) throw new ApiError(404, "FIRMWARE_NOT_FOUND", "Firmware not found");

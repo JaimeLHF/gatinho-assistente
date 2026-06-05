@@ -24,6 +24,17 @@ export async function latest(_req: Request, res: Response) {
 
 export async function download(req: Request, res: Response) {
   const version = req.params.version as string;
+  const filename = await firmwareService.getFilename(version);
+
+  // In production, use nginx X-Accel-Redirect for zero-copy file serving
+  if (process.env.NODE_ENV === "production") {
+    res.set("X-Accel-Redirect", `/internal-uploads/${filename}`);
+    res.set("Content-Disposition", `attachment; filename="firmware-${version}.bin"`);
+    res.set("Content-Type", "application/octet-stream");
+    res.status(200).end();
+    return;
+  }
+
   const filePath = await firmwareService.getFilePath(version);
   res.download(filePath, `firmware-${version}.bin`);
 }

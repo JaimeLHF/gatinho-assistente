@@ -1,7 +1,9 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import { pinoHttp } from "pino-http";
 import { env } from "./config/env.js";
+import { logger } from "./lib/logger.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import { authLimiter, apiLimiter, devicePollLimiter } from "./middlewares/rateLimiter.js";
 import healthRouter from "./routes/health.js";
@@ -20,6 +22,7 @@ if (env.NODE_ENV === "production") {
 }
 
 app.use(helmet());
+app.use(pinoHttp({ logger, autoLogging: { ignore: (req: { url?: string }) => req.url === "/api/v1/health" } }));
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json());
 
