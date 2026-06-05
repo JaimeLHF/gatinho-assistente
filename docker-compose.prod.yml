@@ -1,7 +1,15 @@
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   mysql:
     image: mysql:8
     restart: unless-stopped
+    <<: *default-logging
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: gatinho_pet
@@ -21,6 +29,7 @@ services:
       context: .
       dockerfile: api/Dockerfile
     restart: unless-stopped
+    <<: *default-logging
     env_file:
       - api/.env.production
     environment:
@@ -33,6 +42,7 @@ services:
         condition: service_healthy
     networks:
       - internal
+    stop_grace_period: 15s
 
   web:
     build:
@@ -41,12 +51,14 @@ services:
       args:
         VITE_API_URL: /api/v1
     restart: unless-stopped
+    <<: *default-logging
     networks:
       - internal
 
   nginx:
     image: nginx:alpine
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "80:80"
       - "443:443"
@@ -66,6 +78,7 @@ services:
   certbot:
     image: certbot/certbot
     restart: unless-stopped
+    <<: *default-logging
     volumes:
       - certbot_conf:/etc/letsencrypt
       - certbot_www:/var/www/certbot
