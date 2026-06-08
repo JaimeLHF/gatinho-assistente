@@ -13,7 +13,7 @@ const router = Router();
 router.get("/me", authenticate, async (req: Request, res: Response) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.id },
-    select: { id: true, email: true, name: true, createdAt: true },
+    select: { id: true, email: true, name: true, role: true, createdAt: true },
   });
   if (!user) {
     throw new ApiError(404, "USER_NOT_FOUND", "User not found");
@@ -38,7 +38,7 @@ router.patch(
     const user = await prisma.user.update({
       where: { id: req.user!.id },
       data: req.body,
-      select: { id: true, email: true, name: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, createdAt: true },
     });
     res.json(user);
   },

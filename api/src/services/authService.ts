@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma.js";
 import { signAccess, signRefresh, verifyRefresh } from "../lib/jwt.js";
 import { ApiError } from "../middlewares/errorHandler.js";
+import { env } from "../config/env.js";
 import type { RegisterInput, LoginInput } from "../schemas/auth.js";
 
 const SALT_ROUNDS = 10;
@@ -17,8 +18,8 @@ function getExpiresAt(token: string): Date {
   return new Date(decoded.exp! * 1000);
 }
 
-function userDto(user: { id: string; email: string; name: string }) {
-  return { id: user.id, email: user.email, name: user.name };
+function userDto(user: { id: string; email: string; name: string; role: string }) {
+  return { id: user.id, email: user.email, name: user.name, role: user.role };
 }
 
 export async function register(input: RegisterInput) {
@@ -30,12 +31,13 @@ export async function register(input: RegisterInput) {
   }
 
   const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+  const role = env.ADMIN_EMAIL && input.email === env.ADMIN_EMAIL ? "ADMIN" : "USER";
   const user = await prisma.user.create({
-    data: { email: input.email, passwordHash, name: input.name },
+    data: { email: input.email, passwordHash, name: input.name, role: role as "ADMIN" | "USER" },
   });
 
-  const accessToken = signAccess({ sub: user.id, email: user.email });
-  const refreshToken = signRefresh({ sub: user.id, email: user.email });
+  const accessToken = signAccess({ sub: user.id, email: user.email, role: user.role });
+  const refreshToken = signRefresh({ sub: user.id, email: user.email, role: user.role });
 
   await prisma.refreshToken.create({
     data: {
@@ -61,8 +63,8 @@ export async function login(input: LoginInput) {
     throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid email or password");
   }
 
-  const accessToken = signAccess({ sub: user.id, email: user.email });
-  const refreshToken = signRefresh({ sub: user.id, email: user.email });
+  const accessToken = signAccess({ sub: user.id, email: user.email, role: user.role });
+  const refreshToken = signRefresh({ sub: user.id, email: user.email, role: user.role });
 
   await prisma.refreshToken.create({
     data: {
@@ -95,8 +97,8 @@ export async function refresh(oldToken: string) {
     data: { revokedAt: new Date() },
   });
 
-  const accessToken = signAccess({ sub: payload.sub, email: payload.email });
-  const refreshToken = signRefresh({ sub: payload.sub, email: payload.email });
+  const accessToken = signAccess({ sub: payload.sub, email: payload.email, role: payload.role });
+  const refreshToken = signRefresh({ sub: payload.sub, email: payload.email, role: payload.role });
 
   await prisma.refreshToken.create({
     data: {

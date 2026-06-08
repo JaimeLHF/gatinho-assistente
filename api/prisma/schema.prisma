@@ -12,6 +12,7 @@ model User {
   email         String         @unique
   passwordHash  String
   name          String
+  role          Role           @default(USER)
   createdAt     DateTime       @default(now())
   devices       Device[]
   events        Event[]
@@ -93,6 +94,11 @@ model Firmware {
 
   @@index([createdAt])
   @@map("firmwares")
+}
+
+enum Role {
+  ADMIN
+  USER
 }
 
 enum EventStatus {

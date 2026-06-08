@@ -7,6 +7,7 @@ declare module "express-serve-static-core" {
     user?: {
       id: string;
       email: string;
+      role: string;
     };
   }
 }
@@ -19,7 +20,7 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
 
   try {
     const payload = verifyAccess(header.slice(7));
-    req.user = { id: payload.sub, email: payload.email };
+    req.user = { id: payload.sub, email: payload.email, role: payload.role };
     next();
   } catch {
     throw new ApiError(401, "UNAUTHORIZED", "Invalid or expired token");

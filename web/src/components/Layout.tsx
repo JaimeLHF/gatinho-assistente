@@ -50,9 +50,11 @@ export default function Layout() {
             <NavLink to="/devices" className={linkClass}>
               Dispositivos
             </NavLink>
-            <NavLink to="/firmware" className={linkClass}>
-              Firmware
-            </NavLink>
+            {user?.role === "ADMIN" && (
+              <NavLink to="/firmware" className={linkClass}>
+                Firmware
+              </NavLink>
+            )}
             {user && (
               <NavLink to="/profile" className={linkClass}>
                 {user.name}
@@ -126,9 +128,15 @@ export default function Layout() {
             <NavLink to="/devices" className={mobileLinkClass} onClick={() => setMenuOpen(false)}>
               Dispositivos
             </NavLink>
-            <NavLink to="/firmware" className={mobileLinkClass} onClick={() => setMenuOpen(false)}>
-              Firmware
-            </NavLink>
+            {user?.role === "ADMIN" && (
+              <NavLink
+                to="/firmware"
+                className={mobileLinkClass}
+                onClick={() => setMenuOpen(false)}
+              >
+                Firmware
+              </NavLink>
+            )}
             {user && (
               <>
                 <NavLink
