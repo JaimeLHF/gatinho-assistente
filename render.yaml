@@ -12,8 +12,6 @@ services:
     buildCommand: pnpm install && pnpm --filter api prisma:generate && pnpm --filter api build
     startCommand: npx prisma migrate deploy --schema=api/prisma/schema.prisma && node api/dist/server.js
     healthCheckPath: /api/v1/health
-    customDomains:
-      - name: api.gatinho.fun
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -35,9 +33,6 @@ services:
     runtime: static
     buildCommand: pnpm install && pnpm --filter web build
     staticPublishPath: web/dist
-    customDomains:
-      - name: gatinho.fun
-      - name: www.gatinho.fun
     headers:
       - path: /*
         name: X-Frame-Options
