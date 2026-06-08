@@ -3,7 +3,7 @@ packages:
   - web
 allowBuilds:
   '@prisma/engines': true
-  bcrypt: false
+  bcrypt: true
   esbuild: true
   prisma: true
 minimumReleaseAgeExclude:

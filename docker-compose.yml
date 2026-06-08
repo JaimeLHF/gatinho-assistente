@@ -1,16 +1,17 @@
 services:
-  mysql:
-    image: mysql:8
+  postgres:
+    image: postgres:17
     restart: unless-stopped
     ports:
-      - "3306:3306"
+      - "5432:5432"
     environment:
-      MYSQL_ROOT_PASSWORD: senha
-      MYSQL_DATABASE: gatinho_pet
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: senha
+      POSTGRES_DB: gatinho_pet
     volumes:
-      - mysql_data:/var/lib/mysql
+      - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "pg_isready -U root -d gatinho_pet"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -25,9 +26,9 @@ services:
     env_file:
       - api/.env
     environment:
-      DATABASE_URL: mysql://root:senha@mysql:3306/gatinho_pet
+      DATABASE_URL: postgresql://root:senha@postgres:5432/gatinho_pet
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
 
   adminer:
@@ -37,4 +38,4 @@ services:
       - "8080:8080"
 
 volumes:
-  mysql_data:
+  pg_data:

@@ -1,6 +1,6 @@
 #!/bin/bash
-# MySQL backup script — run via cron or manually
-# Usage: ./infra/backup-mysql.sh
+# PostgreSQL backup script — run via cron or manually
+# Usage: ./infra/backup-db.sh
 # Backups are stored in ./backups/ with 7-day retention
 
 set -euo pipefail
@@ -15,8 +15,8 @@ mkdir -p "${BACKUP_DIR}"
 
 echo "[$(date)] Starting backup..."
 
-docker compose -f "${COMPOSE_FILE}" exec -T mysql \
-  mysqldump -u root -p"${MYSQL_ROOT_PASSWORD}" gatinho_pet \
+docker compose -f "${COMPOSE_FILE}" exec -T postgres \
+  pg_dump -U root gatinho_pet \
   | gzip > "${BACKUP_DIR}/${FILENAME}"
 
 echo "[$(date)] Backup saved: ${FILENAME} ($(du -h "${BACKUP_DIR}/${FILENAME}" | cut -f1))"

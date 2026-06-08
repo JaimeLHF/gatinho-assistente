@@ -38,15 +38,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
     services:
-      mysql:
-        image: mysql:8
+      postgres:
+        image: postgres:17
         env:
-          MYSQL_ROOT_PASSWORD: testpassword
-          MYSQL_DATABASE: gatinho_pet
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: gatinho_pet
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping -h localhost"
+          --health-cmd="pg_isready -U root -d gatinho_pet"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -71,12 +72,12 @@ jobs:
       - name: Run migrations
         run: pnpm --filter api prisma migrate deploy
         env:
-          DATABASE_URL: mysql://root:testpassword@localhost:3306/gatinho_pet
+          DATABASE_URL: postgresql://root:testpassword@localhost:5432/gatinho_pet
 
       - name: Run tests
         run: pnpm test
         env:
-          DATABASE_URL: mysql://root:testpassword@localhost:3306/gatinho_pet
+          DATABASE_URL: postgresql://root:testpassword@localhost:5432/gatinho_pet
           JWT_ACCESS_SECRET: ci-test-access-secret
           JWT_REFRESH_SECRET: ci-test-refresh-secret
           NODE_ENV: test

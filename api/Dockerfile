@@ -23,6 +23,7 @@ RUN pnpm install --frozen-lockfile --filter api --prod
 COPY --from=build /app/api/dist api/dist
 COPY --from=build /app/api/src/generated api/src/generated
 COPY --from=build /app/api/prisma api/prisma
+COPY api/prisma.config.ts api/prisma.config.ts
 COPY api/entrypoint.sh api/entrypoint.sh
 RUN chmod +x api/entrypoint.sh
 EXPOSE 3001

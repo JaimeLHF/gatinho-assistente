@@ -6,18 +6,19 @@ x-logging: &default-logging
       max-file: "3"
 
 services:
-  mysql:
-    image: mysql:8
+  postgres:
+    image: postgres:17
     restart: unless-stopped
     <<: *default-logging
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: gatinho_pet
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: gatinho_pet
     volumes:
-      - mysql_data:/var/lib/mysql
+      - pg_data:/var/lib/postgresql/data
       - ./backups:/backups
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "pg_isready -U root -d gatinho_pet"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -33,12 +34,12 @@ services:
     env_file:
       - api/.env.production
     environment:
-      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/gatinho_pet
+      DATABASE_URL: postgresql://root:${POSTGRES_PASSWORD}@postgres:5432/gatinho_pet
       NODE_ENV: production
     volumes:
       - uploads:/app/api/uploads
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     networks:
       - internal
@@ -72,7 +73,6 @@ services:
       - web
     networks:
       - internal
-    # Reload nginx when certificates renew
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
 
   certbot:
@@ -82,11 +82,10 @@ services:
     volumes:
       - certbot_conf:/etc/letsencrypt
       - certbot_www:/var/www/certbot
-    # Renew certificates every 12h
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'"
 
 volumes:
-  mysql_data:
+  pg_data:
   uploads:
   certbot_conf:
   certbot_www:
