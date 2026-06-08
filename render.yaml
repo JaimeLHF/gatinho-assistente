@@ -31,7 +31,6 @@ services:
   - type: web
     name: gatinho-web
     runtime: static
-    plan: free
     buildCommand: pnpm install && pnpm --filter web build
     staticPublishPath: web/dist
     headers:
