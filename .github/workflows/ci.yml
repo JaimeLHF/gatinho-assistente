@@ -70,7 +70,7 @@ jobs:
         run: pnpm --filter api prisma:generate
 
       - name: Run migrations
-        run: pnpm --filter api prisma migrate deploy
+        run: cd api && npx prisma migrate deploy
         env:
           DATABASE_URL: postgresql://root:testpassword@localhost:5432/gatinho_pet
 
