@@ -20,8 +20,15 @@ void wifiConfigBegin() {
         Serial.println("[wifi-config] NVS vazio, usando config.h fallback");
         prefs.putString("ssid", WIFI_SSID);
         prefs.putString("pwd", WIFI_PASSWORD);
+        prefs.putString("api_url", API_BASE_URL);
+        prefs.putString("token", DEVICE_TOKEN);
     } else {
-        Serial.println("[wifi-config] Lendo SSID/pwd do NVS");
+        Serial.println("[wifi-config] Lendo config do NVS");
+        // Migrar dispositivos antigos que nao tinham api_url/token
+        if (!prefs.isKey("api_url")) {
+            prefs.putString("api_url", API_BASE_URL);
+            prefs.putString("token", DEVICE_TOKEN);
+        }
     }
 }
 
@@ -33,10 +40,21 @@ String wifiConfigGetPassword() {
     return prefs.getString("pwd", "");
 }
 
-void wifiConfigSave(const String& ssid, const String& password) {
+String wifiConfigGetApiUrl() {
+    return prefs.getString("api_url", API_BASE_URL);
+}
+
+String wifiConfigGetToken() {
+    return prefs.getString("token", "");
+}
+
+void wifiConfigSave(const String& ssid, const String& password,
+                    const String& apiUrl, const String& token) {
     prefs.putString("ssid", ssid);
     prefs.putString("pwd", password);
-    Serial.printf("[wifi-config] Salvo SSID=%s\n", ssid.c_str());
+    prefs.putString("api_url", apiUrl);
+    prefs.putString("token", token);
+    Serial.printf("[wifi-config] Salvo SSID=%s, API=%s\n", ssid.c_str(), apiUrl.c_str());
 }
 
 void wifiConfigClear() {

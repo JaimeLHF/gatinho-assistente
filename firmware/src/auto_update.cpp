@@ -1,13 +1,12 @@
 #include "auto_update.h"
 #include "config.h"
+#include "wifi_config.h"
 
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <Update.h>
-
-static const bool USE_HTTPS = String(API_BASE_URL).startsWith("https");
 
 static WiFiClientSecure secureClient;
 static WiFiClient plainClient;
@@ -17,8 +16,8 @@ static const unsigned long CHECK_INTERVAL_MS = 300000;  // check every 5 minutes
 static bool firstCheck = true;
 
 static void httpBegin(HTTPClient& http, const String& url) {
-    if (USE_HTTPS) {
-        secureClient.setInsecure();  // skip cert verification (Let's Encrypt is trusted but saves RAM)
+    if (url.startsWith("https")) {
+        secureClient.setInsecure();
         http.begin(secureClient, url);
     } else {
         http.begin(plainClient, url);
@@ -35,11 +34,14 @@ void autoUpdateCheck() {
 
     Serial.printf("[ota-auto] checking for updates (current: %s)\n", FIRMWARE_VERSION);
 
+    String apiUrl = wifiConfigGetApiUrl();
+    String token  = wifiConfigGetToken();
+
     // Step 1: Check if update is available
     HTTPClient http;
-    String checkUrl = String(API_BASE_URL) + "/device/firmware/check";
+    String checkUrl = apiUrl + "/device/firmware/check";
     httpBegin(http, checkUrl);
-    http.addHeader("X-Device-Token", DEVICE_TOKEN);
+    http.addHeader("X-Device-Token", token);
     http.addHeader("X-Firmware-Version", FIRMWARE_VERSION);
     http.setTimeout(10000);
 
@@ -81,7 +83,7 @@ void autoUpdateCheck() {
     // Step 2: Download and flash
     HTTPClient dlHttp;
     httpBegin(dlHttp, String(downloadUrl));
-    dlHttp.addHeader("X-Device-Token", DEVICE_TOKEN);
+    dlHttp.addHeader("X-Device-Token", token);
     dlHttp.setTimeout(30000);
 
     int dlCode = dlHttp.GET();

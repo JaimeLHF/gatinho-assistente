@@ -19,9 +19,12 @@ static const char PAGE_HTML[] PROGMEM = R"rawliteral(
     body { font-family: -apple-system, sans-serif; max-width: 400px; margin: 30px auto; padding: 20px; background: #f5f5f5; }
     .card { background: white; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
     h1 { color: #ff7700; margin-top: 0; }
+    h2 { color: #333; font-size: 14px; margin: 20px 0 8px; padding-top: 16px; border-top: 1px solid #eee; }
+    h2:first-of-type { border-top: none; margin-top: 12px; padding-top: 0; }
     label { display: block; margin: 12px 0 4px; font-weight: 600; color: #555; }
     input { width: 100%; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; }
     input:focus { outline: none; border-color: #ff7700; }
+    .hint { font-size: 12px; color: #888; margin-top: 4px; }
     button { width: 100%; padding: 14px; font-size: 16px; background: #ff7700; color: white; border: 0; border-radius: 8px; margin-top: 20px; cursor: pointer; font-weight: 600; }
     button:hover { background: #e66600; }
   </style>
@@ -29,12 +32,25 @@ static const char PAGE_HTML[] PROGMEM = R"rawliteral(
 <body>
   <div class="card">
     <h1>&#x1F431; Gatinho-Pet</h1>
-    <p>Configure a rede WiFi para conectar o seu gatinho.</p>
+    <p>Configure o seu gatinho para conectar.</p>
     <form method="POST" action="/save">
+      <h2>WiFi</h2>
       <label for="ssid">Nome da rede (SSID):</label>
       <input id="ssid" name="ssid" required maxlength="32" autocomplete="off">
       <label for="password">Senha:</label>
       <input id="password" name="password" type="password" maxlength="64" autocomplete="off">
+
+      <h2>Servidor</h2>
+      <label for="api_url">URL da API:</label>
+      <input id="api_url" name="api_url" required maxlength="128" autocomplete="off"
+             value="https://gatinho-api.onrender.com/api/v1">
+      <div class="hint">Altere apenas se estiver rodando seu proprio servidor.</div>
+
+      <label for="token">Token do dispositivo:</label>
+      <input id="token" name="token" required maxlength="64" autocomplete="off"
+             placeholder="Cole o token de 64 caracteres">
+      <div class="hint">Copie do painel web ao criar um novo dispositivo.</div>
+
       <button type="submit">Salvar e Reiniciar</button>
     </form>
   </div>
@@ -66,17 +82,23 @@ static void handleRoot() {
 }
 
 static void handleSave() {
-    String ssid = server.arg("ssid");
-    String pwd  = server.arg("password");
+    String ssid    = server.arg("ssid");
+    String pwd     = server.arg("password");
+    String apiUrl  = server.arg("api_url");
+    String token   = server.arg("token");
 
     if (ssid.length() == 0) {
         server.send(400, "text/plain", "SSID vazio");
         return;
     }
+    if (token.length() == 0) {
+        server.send(400, "text/plain", "Token vazio");
+        return;
+    }
 
-    wifiConfigSave(ssid, pwd);
+    wifiConfigSave(ssid, pwd, apiUrl, token);
     server.send_P(200, "text/html", PAGE_OK);
-    Serial.printf("[portal] Credenciais salvas, reiniciando em 3s...\n");
+    Serial.printf("[portal] Config salva, reiniciando em 3s...\n");
     delay(3000);
     ESP.restart();
 }
