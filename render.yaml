@@ -12,6 +12,8 @@ services:
     buildCommand: pnpm install && pnpm --filter api prisma:generate && pnpm --filter api build
     startCommand: npx prisma migrate deploy --schema=api/prisma/schema.prisma && node api/dist/server.js
     healthCheckPath: /api/v1/health
+    customDomains:
+      - name: api.gatinho.fun
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -24,7 +26,7 @@ services:
       - key: JWT_REFRESH_SECRET
         generateValue: true
       - key: CORS_ORIGIN
-        sync: false
+        value: https://gatinho.fun
       - key: PORT
         value: "3001"
 
@@ -33,6 +35,9 @@ services:
     runtime: static
     buildCommand: pnpm install && pnpm --filter web build
     staticPublishPath: web/dist
+    customDomains:
+      - name: gatinho.fun
+      - name: www.gatinho.fun
     headers:
       - path: /*
         name: X-Frame-Options
@@ -43,4 +48,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        sync: false
+        value: https://api.gatinho.fun/api/v1
