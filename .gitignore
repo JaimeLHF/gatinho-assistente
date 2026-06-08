@@ -22,3 +22,7 @@ backups/*.sql.gz
 # OS
 .DS_Store
 Thumbs.db
+
+# SSH keys
+*.pub
+gitub_wsl*
