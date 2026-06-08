@@ -10,7 +10,7 @@ services:
     runtime: node
     plan: free
     buildCommand: pnpm install && pnpm --filter api prisma:generate && pnpm --filter api build
-    startCommand: npx prisma migrate deploy --schema=api/prisma/schema.prisma && node api/dist/server.js
+    startCommand: cd api && npx prisma migrate deploy && node dist/server.js
     healthCheckPath: /api/v1/health
     envVars:
       - key: DATABASE_URL
