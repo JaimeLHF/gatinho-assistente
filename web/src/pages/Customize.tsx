@@ -87,16 +87,17 @@ interface RegionShift {
 }
 
 function remapPixelHsl(
-  ph: number, ps: number, pl: number,
+  ph: number,
+  ps: number,
+  pl: number,
   shift: RegionShift,
 ): [number, number, number] {
   const nh = (((ph + shift.dh) % 1) + 1) % 1;
-  const ns = shift.refS > 0.01
-    ? Math.min(1, ps * (shift.targetS / shift.refS))
-    : shift.targetS;
-  const nl = shift.refL > 0.01
-    ? Math.min(1, pl * (shift.targetL / shift.refL))
-    : Math.min(1, pl + shift.targetL);
+  const ns = shift.refS > 0.01 ? Math.min(1, ps * (shift.targetS / shift.refS)) : shift.targetS;
+  const nl =
+    shift.refL > 0.01
+      ? Math.min(1, pl * (shift.targetL / shift.refL))
+      : Math.min(1, pl + shift.targetL);
   return [nh, ns, nl];
 }
 
@@ -134,9 +135,9 @@ function drawStarsBg(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.fillStyle = "#FFFFFF";
   // Deterministic stars using simple hash
   for (let i = 0; i < 40; i++) {
-    const x = ((i * 137 + 59) % w);
-    const y = ((i * 97 + 23) % h);
-    const s = (i % 3 === 0) ? 2 : 1;
+    const x = (i * 137 + 59) % w;
+    const y = (i * 97 + 23) % h;
+    const s = i % 3 === 0 ? 2 : 1;
     ctx.fillRect(x, y, s, s);
   }
 }
@@ -173,11 +174,11 @@ function drawFieldBg(ctx: CanvasRenderingContext2D, w: number, h: number) {
 }
 
 const BG_PRESETS: BgPreset[] = [
-  { type: "solid",  label: "Solido",     render: drawSolidBg },
-  { type: "stars",  label: "Noite",      render: (_ctx, w, h) => drawStarsBg(_ctx, w, h) },
-  { type: "sky",    label: "Ceu",        render: (ctx, w, h) => drawSkyBg(ctx, w, h) },
+  { type: "solid", label: "Solido", render: drawSolidBg },
+  { type: "stars", label: "Noite", render: (_ctx, w, h) => drawStarsBg(_ctx, w, h) },
+  { type: "sky", label: "Ceu", render: (ctx, w, h) => drawSkyBg(ctx, w, h) },
   { type: "sunset", label: "Por do sol", render: (ctx, w, h) => drawSunsetBg(ctx, w, h) },
-  { type: "field",  label: "Campo",      render: (ctx, w, h) => drawFieldBg(ctx, w, h) },
+  { type: "field", label: "Campo", render: (ctx, w, h) => drawFieldBg(ctx, w, h) },
 ];
 
 function renderBgThumb(preset: BgPreset, color: string): string {
@@ -199,19 +200,139 @@ interface CatPreset {
 }
 
 const PRESETS: CatPreset[] = [
-  { name: "Original",     colors: defaultColors() },
-  { name: "Branco",       colors: { outline: "#333333", stripes: "#CCCCCC", body: "#EEEEEE", belly: "#FFFFFF", eyes: "#55AA55", nose: "#FFAAAA" } },
-  { name: "Cinza",        colors: { outline: "#111122", stripes: "#555570", body: "#7777AA", belly: "#9999BB", eyes: "#55CC55", nose: "#887788" } },
-  { name: "Prata",        colors: { outline: "#111111", stripes: "#555566", body: "#AAAABB", belly: "#DDDDEE", eyes: "#55BB55", nose: "#BBAAAA" } },
-  { name: "Preto",        colors: { outline: "#000000", stripes: "#1A1A22", body: "#222233", belly: "#333344", eyes: "#DDBB22", nose: "#333333" } },
-  { name: "Laranja",      colors: { outline: "#1A1000", stripes: "#CC8822", body: "#FFAA33", belly: "#FFCC66", eyes: "#55AA55", nose: "#FFBBAA" } },
-  { name: "Marrom",       colors: { outline: "#111105", stripes: "#664422", body: "#996644", belly: "#BB8866", eyes: "#55AA55", nose: "#AA8866" } },
-  { name: "Chocolate",    colors: { outline: "#0A0A00", stripes: "#442211", body: "#664433", belly: "#886655", eyes: "#55AA55", nose: "#775544" } },
-  { name: "Creme",        colors: { outline: "#222211", stripes: "#CC9955", body: "#EEBB77", belly: "#FFDDAA", eyes: "#55AA55", nose: "#DDBB99" } },
-  { name: "Cinza Tabby",  colors: { outline: "#000000", stripes: "#333344", body: "#666677", belly: "#888899", eyes: "#CCAA22", nose: "#666666" } },
-  { name: "Ruivo",        colors: { outline: "#110500", stripes: "#DD6622", body: "#FF8833", belly: "#FFBB66", eyes: "#55AA55", nose: "#FFAA88" } },
-  { name: "Caramelo",     colors: { outline: "#111005", stripes: "#885522", body: "#AA7744", belly: "#CC9966", eyes: "#55AA55", nose: "#BB9977" } },
-  { name: "Siames",       colors: { outline: "#2A1A0A", stripes: "#6B4430", body: "#D4B896", belly: "#EAD8C0", eyes: "#4499DD", nose: "#C49A7A" } },
+  { name: "Original", colors: defaultColors() },
+  {
+    name: "Branco",
+    colors: {
+      outline: "#333333",
+      stripes: "#CCCCCC",
+      body: "#EEEEEE",
+      belly: "#FFFFFF",
+      eyes: "#55AA55",
+      nose: "#FFAAAA",
+    },
+  },
+  {
+    name: "Cinza",
+    colors: {
+      outline: "#111122",
+      stripes: "#555570",
+      body: "#7777AA",
+      belly: "#9999BB",
+      eyes: "#55CC55",
+      nose: "#887788",
+    },
+  },
+  {
+    name: "Prata",
+    colors: {
+      outline: "#111111",
+      stripes: "#555566",
+      body: "#AAAABB",
+      belly: "#DDDDEE",
+      eyes: "#55BB55",
+      nose: "#BBAAAA",
+    },
+  },
+  {
+    name: "Preto",
+    colors: {
+      outline: "#000000",
+      stripes: "#1A1A22",
+      body: "#222233",
+      belly: "#333344",
+      eyes: "#DDBB22",
+      nose: "#333333",
+    },
+  },
+  {
+    name: "Laranja",
+    colors: {
+      outline: "#1A1000",
+      stripes: "#CC8822",
+      body: "#FFAA33",
+      belly: "#FFCC66",
+      eyes: "#55AA55",
+      nose: "#FFBBAA",
+    },
+  },
+  {
+    name: "Marrom",
+    colors: {
+      outline: "#111105",
+      stripes: "#664422",
+      body: "#996644",
+      belly: "#BB8866",
+      eyes: "#55AA55",
+      nose: "#AA8866",
+    },
+  },
+  {
+    name: "Chocolate",
+    colors: {
+      outline: "#0A0A00",
+      stripes: "#442211",
+      body: "#664433",
+      belly: "#886655",
+      eyes: "#55AA55",
+      nose: "#775544",
+    },
+  },
+  {
+    name: "Creme",
+    colors: {
+      outline: "#222211",
+      stripes: "#CC9955",
+      body: "#EEBB77",
+      belly: "#FFDDAA",
+      eyes: "#55AA55",
+      nose: "#DDBB99",
+    },
+  },
+  {
+    name: "Cinza Tabby",
+    colors: {
+      outline: "#000000",
+      stripes: "#333344",
+      body: "#666677",
+      belly: "#888899",
+      eyes: "#CCAA22",
+      nose: "#666666",
+    },
+  },
+  {
+    name: "Ruivo",
+    colors: {
+      outline: "#110500",
+      stripes: "#DD6622",
+      body: "#FF8833",
+      belly: "#FFBB66",
+      eyes: "#55AA55",
+      nose: "#FFAA88",
+    },
+  },
+  {
+    name: "Caramelo",
+    colors: {
+      outline: "#111005",
+      stripes: "#885522",
+      body: "#AA7744",
+      belly: "#CC9966",
+      eyes: "#55AA55",
+      nose: "#BB9977",
+    },
+  },
+  {
+    name: "Siames",
+    colors: {
+      outline: "#2A1A0A",
+      stripes: "#6B4430",
+      body: "#D4B896",
+      belly: "#EAD8C0",
+      eyes: "#4499DD",
+      nose: "#C49A7A",
+    },
+  },
 ];
 
 // Build shift table from color map
@@ -247,11 +368,20 @@ function renderPresetThumb(
     const g = sprite[si + 1] as number;
     const b = sprite[si + 2] as number;
     const shift = shifts[region];
-    if (!shift) { data[si] = r; data[si + 1] = g; data[si + 2] = b; data[si + 3] = 255; continue; }
+    if (!shift) {
+      data[si] = r;
+      data[si + 1] = g;
+      data[si + 2] = b;
+      data[si + 3] = 255;
+      continue;
+    }
     const [ph, ps, pl] = rgbToHsl(r, g, b);
     const [nh, ns, nl] = remapPixelHsl(ph, ps, pl, shift);
     const [nr, ng, nb] = hslToRgb(nh, ns, nl);
-    data[si] = nr; data[si + 1] = ng; data[si + 2] = nb; data[si + 3] = 255;
+    data[si] = nr;
+    data[si + 1] = ng;
+    data[si + 2] = nb;
+    data[si + 3] = 255;
   }
 
   ctx.putImageData(imageData, 0, 0);
@@ -306,24 +436,28 @@ export default function Customize() {
   const device = devices?.find((d) => d.id === deviceId);
 
   // Derive colors: user overrides > server data > defaults
-  const colors: ColorMap = useMemo(() => overrides ?? (existing ? {
-    outline: existing.outline,
-    stripes: existing.stripes,
-    body: existing.body,
-    belly: existing.belly,
-    eyes: existing.eyes,
-    nose: existing.nose,
-  } : defaultColors()), [overrides, existing]);
+  const colors: ColorMap = useMemo(
+    () =>
+      overrides ??
+      (existing
+        ? {
+            outline: existing.outline,
+            stripes: existing.stripes,
+            body: existing.body,
+            belly: existing.belly,
+            eyes: existing.eyes,
+            nose: existing.nose,
+          }
+        : defaultColors()),
+    [overrides, existing],
+  );
 
   // Derive background: override > server > defaults
   const bgType: BgType = bgOverride?.type ?? (existing?.bgType as BgType | undefined) ?? "solid";
   const bgColor: string = bgOverride?.color ?? existing?.bgColor ?? "#000000";
 
   // Background thumbnail previews
-  const bgThumbs = useMemo(
-    () => BG_PRESETS.map((p) => renderBgThumb(p, bgColor)),
-    [bgColor],
-  );
+  const bgThumbs = useMemo(() => BG_PRESETS.map((p) => renderBgThumb(p, bgColor)), [bgColor]);
 
   // Save mutation
   const saveMutation = useMutation({
@@ -484,10 +618,7 @@ export default function Customize() {
                   onMouseEnter={() => setHighlightRegion(region.id)}
                   onMouseLeave={() => setHighlightRegion(null)}
                 >
-                  <label
-                    htmlFor={`color-${region.name}`}
-                    className="relative cursor-pointer"
-                  >
+                  <label htmlFor={`color-${region.name}`} className="relative cursor-pointer">
                     <input
                       id={`color-${region.name}`}
                       type="color"
@@ -568,11 +699,13 @@ export default function Customize() {
                     className="w-16 h-9 rounded object-cover"
                     style={{ imageRendering: "pixelated" }}
                   />
-                  <span className={`text-[10px] leading-tight transition-colors ${
-                    bgType === preset.type
-                      ? "text-indigo-600 dark:text-indigo-400 font-medium"
-                      : "text-gray-500 dark:text-slate-400"
-                  }`}>
+                  <span
+                    className={`text-[10px] leading-tight transition-colors ${
+                      bgType === preset.type
+                        ? "text-indigo-600 dark:text-indigo-400 font-medium"
+                        : "text-gray-500 dark:text-slate-400"
+                    }`}
+                  >
                     {preset.label}
                   </span>
                 </button>
@@ -594,8 +727,12 @@ export default function Customize() {
                   />
                 </label>
                 <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Cor de fundo</span>
-                  <p className="text-xs text-gray-400 dark:text-slate-500 font-mono">{bgColor.toUpperCase()}</p>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    Cor de fundo
+                  </span>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 font-mono">
+                    {bgColor.toUpperCase()}
+                  </p>
                 </div>
               </div>
             )}
@@ -623,7 +760,8 @@ export default function Customize() {
           <div className="flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
             <span className="text-amber-500 mt-0.5 text-sm">&#9432;</span>
             <p className="text-xs text-amber-700 dark:text-amber-300">
-              Apos salvar, as novas cores serao aplicadas automaticamente no dispositivo em ate 60 segundos, no proximo ciclo de sincronizacao.
+              Apos salvar, as novas cores serao aplicadas automaticamente no dispositivo em ate 60
+              segundos, no proximo ciclo de sincronizacao.
             </p>
           </div>
         </div>

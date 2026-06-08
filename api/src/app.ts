@@ -22,7 +22,12 @@ if (env.NODE_ENV === "production") {
 }
 
 app.use(helmet());
-app.use(pinoHttp({ logger, autoLogging: { ignore: (req: { url?: string }) => req.url === "/api/v1/health" } }));
+app.use(
+  pinoHttp({
+    logger,
+    autoLogging: { ignore: (req: { url?: string }) => req.url === "/api/v1/health" },
+  }),
+);
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json());
 

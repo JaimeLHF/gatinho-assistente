@@ -27,7 +27,9 @@ if (
   (UNSAFE_DEFAULTS.includes(parsed.data.JWT_ACCESS_SECRET) ||
     UNSAFE_DEFAULTS.includes(parsed.data.JWT_REFRESH_SECRET))
 ) {
-  console.error("❌ Cannot start in production with default JWT secrets. Set real values in .env.production");
+  console.error(
+    "❌ Cannot start in production with default JWT secrets. Set real values in .env.production",
+  );
   process.exit(1);
 }
 

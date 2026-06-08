@@ -84,16 +84,25 @@ export default function Firmware() {
       <div className="mt-2 flex items-start gap-2 rounded-lg border border-blue-200 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-900/20 px-4 py-3">
         <span className="text-blue-500 mt-0.5 text-sm">&#9432;</span>
         <p className="text-xs text-blue-700 dark:text-blue-300">
-          Ao enviar um novo firmware, todos os dispositivos conectados serao atualizados automaticamente no proximo ciclo de polling (~60s).
+          Ao enviar um novo firmware, todos os dispositivos conectados serao atualizados
+          automaticamente no proximo ciclo de polling (~60s).
         </p>
       </div>
 
       {showForm && (
-        <form onSubmit={handleUpload} className="mt-4 rounded-2xl bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-6 shadow-sm dark:shadow-black/10">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Novo firmware</h2>
+        <form
+          onSubmit={handleUpload}
+          className="mt-4 rounded-2xl bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-6 shadow-sm dark:shadow-black/10"
+        >
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Novo firmware
+          </h2>
           <div className="space-y-4 max-w-md">
             <div>
-              <label htmlFor="fw-version" className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+              <label
+                htmlFor="fw-version"
+                className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+              >
                 Versao
               </label>
               <input
@@ -107,7 +116,10 @@ export default function Firmware() {
               />
             </div>
             <div>
-              <label htmlFor="fw-file" className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+              <label
+                htmlFor="fw-file"
+                className="block text-sm font-medium text-gray-700 dark:text-slate-300"
+              >
                 Arquivo .bin
               </label>
               <input
@@ -135,7 +147,11 @@ export default function Firmware() {
               </button>
               <button
                 type="button"
-                onClick={() => { setShowForm(false); setFile(null); setVersion(""); }}
+                onClick={() => {
+                  setShowForm(false);
+                  setFile(null);
+                  setVersion("");
+                }}
                 className="rounded border border-gray-300 dark:border-slate-600 px-4 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Cancelar
@@ -158,7 +174,9 @@ export default function Firmware() {
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-medium text-gray-900 dark:text-white font-mono">v{fw.version}</h3>
+                  <h3 className="font-medium text-gray-900 dark:text-white font-mono">
+                    v{fw.version}
+                  </h3>
                   {i === 0 && (
                     <span className="rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:text-green-400">
                       atual

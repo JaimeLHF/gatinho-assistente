@@ -41,7 +41,10 @@ export async function deleteCustomization(req: Request, res: Response) {
 }
 
 export async function nextEvent(req: Request, res: Response) {
-  const { event, customization } = await deviceService.nextEvent(req.device!.id, req.device!.userId);
+  const { event, customization } = await deviceService.nextEvent(
+    req.device!.id,
+    req.device!.userId,
+  );
   res.json({
     event: event ?? null,
     customization: customization ?? null,

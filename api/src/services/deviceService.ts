@@ -1,7 +1,11 @@
 import { randomBytes, createHash } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { ApiError } from "../middlewares/errorHandler.js";
-import type { CreateDeviceInput, UpdateDeviceInput, CustomizationInput } from "../schemas/device.js";
+import type {
+  CreateDeviceInput,
+  UpdateDeviceInput,
+  CustomizationInput,
+} from "../schemas/device.js";
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -90,7 +94,11 @@ export async function getCustomization(userId: string, deviceId: string) {
   return prisma.deviceCustomization.findUnique({ where: { deviceId } });
 }
 
-export async function upsertCustomization(userId: string, deviceId: string, data: CustomizationInput) {
+export async function upsertCustomization(
+  userId: string,
+  deviceId: string,
+  data: CustomizationInput,
+) {
   const device = await prisma.device.findUnique({ where: { id: deviceId } });
 
   if (!device || device.userId !== userId) {
@@ -128,7 +136,16 @@ export async function nextEvent(deviceId: string, userId: string) {
     }),
     prisma.deviceCustomization.findUnique({
       where: { deviceId },
-      select: { body: true, stripes: true, belly: true, outline: true, eyes: true, nose: true, bgType: true, bgColor: true },
+      select: {
+        body: true,
+        stripes: true,
+        belly: true,
+        outline: true,
+        eyes: true,
+        nose: true,
+        bgType: true,
+        bgColor: true,
+      },
     }),
   ]);
 

@@ -8,7 +8,9 @@ router.get("/health", async (_req, res) => {
     await prisma.$queryRawUnsafe("SELECT 1");
     res.json({ status: "ok", db: "connected", time: new Date().toISOString() });
   } catch {
-    res.status(503).json({ status: "degraded", db: "disconnected", time: new Date().toISOString() });
+    res
+      .status(503)
+      .json({ status: "degraded", db: "disconnected", time: new Date().toISOString() });
   }
 });
 
