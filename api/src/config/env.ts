@@ -9,7 +9,10 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
   PORT: z.coerce.number().default(3001),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-  CORS_ORIGIN: z.string().default("http://localhost:5173"),
+  CORS_ORIGIN: z
+    .string()
+    .default("http://localhost:5173")
+    .transform((val) => (val.includes(",") ? val.split(",").map((s) => s.trim()) : val)),
   ADMIN_EMAIL: z.string().optional(),
 });
 
